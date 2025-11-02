@@ -1,0 +1,18 @@
+/*******************************************************************
+ * File:        main
+ * Purpose:     WimpTemplates command line tool
+ * Author:      Gerph
+ ******************************************************************/
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "VersionNum"
+
+int main(int argc, char *argv[])
+{
+    printf("WimpTemplates " Module_FullVersionAndDate "\n");
+    printf("Syntax: *WimpTemplates\n");
+
+    exit(EXIT_SUCCESS);
+}
