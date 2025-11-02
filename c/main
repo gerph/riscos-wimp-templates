@@ -38,16 +38,21 @@ struct ctc_templateindexentry {
     char check[(sizeof(templateindexentry_t) == (3*4 + 12)) ? 1 : -1];
 };
 
-
-typedef struct opentemplate_s {
+struct opentemplate_s {
+    struct opentemplate_s   *next;
     FILE                    *fh;
     fileoffset_t             font_data_offset;
     int                      nentries;
     templateindexentry_t    *entries;
-} opentemplate_t;
+};
+
+typedef struct opentemplate_s opentemplate_t;
 
 /* Value to return when we reached the end of file */
 #define READ_EOF (0x0)
+
+
+static opentemplate_t *opentemplates;
 
 
 /*************************************************** Gerph *********
@@ -173,6 +178,8 @@ opentemplate_t *templates_open(const char *filename)
                     goto failed;
                 }
                 ot->entries[i].identifier[len] = '\0';
+                /* FIXME: Check the offset and length are in the file */
+                /* FIXME: Should we check that the template names aren't repeated? */
             }
         }
 
@@ -191,6 +198,10 @@ opentemplate_t *templates_open(const char *filename)
         }
     }
 
+    /* Linked to our tracked chain */
+    ot->next = opentemplates;
+    opentemplates = ot;
+
     return ot;
 
 failed:
@@ -198,6 +209,37 @@ failed:
     free(ot);
     /* FIXME: Better way of reporting errors ? */
     return NULL;
+}
+
+/*************************************************** Gerph *********
+ Function:      templates_close
+ Description:   Close an open template file
+ Parameters:    ot-> the template to close
+ Returns:       0 for success, 1 for failure
+ ******************************************************************/
+int templates_close(opentemplate_t *ot)
+{
+    /* Unlink from the chain */
+    opentemplate_t **lastp = &opentemplates;
+    opentemplate_t *cur = opentemplates;
+    while (cur)
+    {
+        if (cur==ot)
+        {
+            *lastp = cur->next; /* unlink from the chain */
+
+            dprintf("Closing open template file\n");
+            fclose(ot->fh);
+            free(ot->entries);
+            free(ot);
+            return 0;
+        }
+
+        lastp = &ot->next;
+        ot = ot->next;
+    }
+    dprintf("File handle is not open - cannot close\n");
+    return 1;
 }
 
 
@@ -219,6 +261,8 @@ int main(int argc, char *argv[])
     {
         printf("Failed to open file\n");
     }
+
+    templates_close(ot);
 
     exit(EXIT_SUCCESS);
 }
