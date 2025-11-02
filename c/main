@@ -9,10 +9,68 @@
 
 #include "VersionNum"
 
+#define DEBUG
+
+#ifdef DEBUG
+#define dprintf if (1) printf
+#else
+#define dprintf if (0) printf
+#endif
+
+
+typedef struct opentemplate_s {
+    FILE *fh;
+} opentemplate_t;
+
+
+/*************************************************** Gerph *********
+ Function:      templates_open
+ Description:   Open a template file (backend for Wimp_OpenTemplate)
+ Parameters:    filename-> filename to open
+ Returns:       pointer to a open template object, or NULL if we failed
+ ******************************************************************/
+opentemplate_t *templates_open(const char *filename)
+{
+    opentemplate_t *ot;
+    FILE *fh;
+
+    ot = malloc(sizeof(*ot));
+    if (ot == NULL)
+        return NULL;
+
+    fh = fopen(filename, "rb");
+    if (fh == NULL)
+    {
+        dprintf("templates_open: Failed to open file '%s'\n", filename);
+        free(ot);
+        return NULL;
+    }
+
+    dprintf("templates_open: Opened template file '%s'\n", filename);
+    ot->fh = fh;
+
+    return ot;
+}
+
+
 int main(int argc, char *argv[])
 {
+    opentemplate_t *ot;
+    const char *filename;
     printf("WimpTemplates " Module_FullVersionAndDate "\n");
-    printf("Syntax: *WimpTemplates\n");
+    if (argc < 2)
+    {
+        printf("Syntax: WimpTemplates <filename>\n");
+        exit(1);
+    }
+
+    filename = argv[1];
+
+    ot = templates_open(filename);
+    if (!ot)
+    {
+        printf("Failed to open file\n");
+    }
 
     exit(EXIT_SUCCESS);
 }

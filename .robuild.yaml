@@ -23,7 +23,12 @@ jobs:
     # Commands which should be executed to perform the build.
     # The build will terminate if any command returns a non-0 return code or an error.
     script:
-      - amu -f Makefile install INSTDIR=Install
+      - echo Build the test program...
+      - amu -f Makefile
+
+      - echo
+      - echo Test that it runs
+      - aif32.wimptemplates testdata.templates.info
 
     # Outputs from the build are defined in artifacts
     # These are a list of artifacts to report directories or files.
