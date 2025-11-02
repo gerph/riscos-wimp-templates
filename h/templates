@@ -1,0 +1,70 @@
+/*******************************************************************
+ * File:        templates
+ * Purpose:     Template manipulation
+ * Author:      Gerph
+ * Date:        2 Nov 2025
+ ******************************************************************/
+
+#ifndef TEMPLATES_H
+#define TEMPLATES_H
+
+#include <stdint.h>
+
+#include "ctrlstring.h"
+
+#define DEBUG
+
+#ifdef DEBUG
+#define dprintf if (1) printf
+#else
+#define dprintf if (0) printf
+#endif
+
+typedef uint32_t fileoffset_t;
+
+#define TEMPLATE_DATA_TYPE_WINDOW (1)
+
+/* This is the file format - be aware of structure padding - use `packed` in future */
+typedef struct templateindexentry_s {
+    uint32_t         data_offset;
+    uint32_t         data_size;
+    uint32_t         data_type;
+    char             identifier[12]; /* ctrl-terminated */
+} templateindexentry_t;
+
+/* compile time check that the structure is the right size */
+struct ctc_templateindexentry {
+    char check[(sizeof(templateindexentry_t) == (3*4 + 12)) ? 1 : -1];
+};
+
+struct opentemplate_s {
+    struct opentemplate_s   *next;
+    FILE                    *fh;
+    fileoffset_t             font_data_offset;
+    int                      nentries;
+    templateindexentry_t    *entries;
+};
+
+typedef struct opentemplate_s opentemplate_t;
+
+/* Value to return when we reached the end of file */
+#define READ_EOF (0x0)
+
+
+/*************************************************** Gerph *********
+ Function:      templates_open
+ Description:   Open a template file (backend for Wimp_OpenTemplate)
+ Parameters:    filename-> filename to open
+ Returns:       pointer to a open template object, or NULL if we failed
+ ******************************************************************/
+opentemplate_t *templates_open(const char *filename);
+
+/*************************************************** Gerph *********
+ Function:      templates_close
+ Description:   Close an open template file
+ Parameters:    ot-> the template to close
+ Returns:       0 for success, 1 for failure
+ ******************************************************************/
+int templates_close(opentemplate_t *ot);
+
+#endif

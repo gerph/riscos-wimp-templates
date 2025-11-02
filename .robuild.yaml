@@ -30,10 +30,18 @@ jobs:
       - echo Test that it runs
       - aif32.wimptemplates testdata.templates.info
 
+      - echo Build the dummy module...
+      - amu -f MakefileModule
+
+      - echo Copy artifacts
+      - cdir Artifacts
+      - copy aif32.wimptemplates artifacts.test ~CVF
+      - copy rm32.wimptemplates artifacts.WimpTemplates ~CVF
+
     # Outputs from the build are defined in artifacts
     # These are a list of artifacts to report directories or files.
     # Only a single item is currently supported.
     artifacts:
       # Each element of the artifacts should have a path key, which gives the file or
       # directory to return.
-      - path: InstDir
+      - path: Artifacts

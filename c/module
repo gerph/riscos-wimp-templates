@@ -1,0 +1,180 @@
+/*******************************************************************
+ * File:        module
+ * Purpose:     WimpTemplates module interface
+ * Author:      Gerph
+ ******************************************************************/
+
+#include <stdlib.h>
+#include <stdio.h>
+
+#include "kernel.h"
+#include "modhead.h"
+
+#include "templates.h"
+
+
+/***************************************************************************
+ * Function:     Mod_Init
+ * Description:  Initialise the module, setting up vectors, callbacks and
+ *               any other parts of the system necessary for the module to
+ *               function.
+ * Parameters:   tail        = pointer to command line (control terminated)
+ *               podule_base = address of podule module was started from, or
+ *                             NULL if none
+ *               pw          = private word for module
+ * On exit:      Return NULL for successful initialisation, or a pointer to
+ *               an error block if the module could not start properly.
+ **************************************************************************/
+_kernel_oserror *Mod_Init(const char *tail, int podule_base, void *pw)
+{
+    printf("Module WimpTemplates initialised\n");
+    return NULL;
+}
+
+
+/***************************************************************************
+ * Function:     Mod_Final
+ * Description:  Finalise the module, shutting down any systems necessary,
+ *               freeing vectors and releasing workspace
+ * Parameters:   fatal       = fatality indicator; 1 if fatal, 0 if
+ *                             reinitialising
+ *               podule_base = address of podule module was started from, or
+ *                             NULL if none
+ *               pw          = private word for module
+ * On exit:      Return 0 for successful finalisation, or a pointer to an
+ *               error block if module was not shutdown properly.
+ **************************************************************************/
+_kernel_oserror *Mod_Final(int fatal, int podule_base, void *pw)
+{
+    printf("Module WimpTemplates dying\n");
+    return NULL;
+}
+
+
+/* The Wimp only had one template open at a time */
+opentemplate_t *ot;
+
+
+
+/***************************************************************************
+ * Description:  SWI handler routine for Wimp_OpenTemplate
+ * Parameters:   number = SWI number within SWI chunk (i.e. 0 to 63)
+ *               r      = pointer to register block on entry
+ *               pw     = private word for module
+ * On exit:      Return NULL if SWI handled sucessfully, setting return
+ *               register values (r0-r9) in r.
+ *               Return error_BAD_SWI for out of range SWIs.
+ *               Return an error block for a custom error.
+ **************************************************************************/
+_kernel_oserror *SWI_OpenTemplate(int number, _kernel_swi_regs *regs, void *pw)
+{
+    _kernel_oserror *err = NULL;
+    /*
+     * Wimp_OpenTemplate - Opens a specified template file
+     *
+     * =>  R1 -> file_name
+     * <=  R0 corrupted
+     */
+
+    /* Input registers */
+    char * file_name = (char *)regs->r[1];
+    /* Output registers */
+
+    if (ot != NULL)
+        templates_close(ot);
+
+    ot = templates_open(file_name);
+    if (ot == NULL)
+    {
+        /* FIXME: Return an error */
+    }
+
+    /* R0 corrupted */
+    return err;
+}
+
+
+
+
+/***************************************************************************
+ * Description:  SWI handler routine for Wimp_CloseTemplate
+ * Parameters:   number = SWI number within SWI chunk (i.e. 0 to 63)
+ *               r      = pointer to register block on entry
+ *               pw     = private word for module
+ * On exit:      Return NULL if SWI handled sucessfully, setting return
+ *               register values (r0-r9) in r.
+ *               Return error_BAD_SWI for out of range SWIs.
+ *               Return an error block for a custom error.
+ **************************************************************************/
+_kernel_oserror *SWI_CloseTemplate(int number, _kernel_swi_regs *regs, void *pw)
+{
+    _kernel_oserror *err = NULL;
+    /*
+     * Wimp_CloseTemplate - Closes the currently open template file
+     *
+     * <=  R0 corrupted
+     */
+
+    /* Output registers */
+
+    if (ot)
+    {
+        templates_close(ot);
+        ot = NULL;
+    }
+
+    /* R0 corrupted */
+    return err;
+}
+
+
+
+
+/***************************************************************************
+ * Description:  SWI handler routine for Wimp_LoadTemplate
+ * Parameters:   number = SWI number within SWI chunk (i.e. 0 to 63)
+ *               r      = pointer to register block on entry
+ *               pw     = private word for module
+ * On exit:      Return NULL if SWI handled sucessfully, setting return
+ *               register values (r0-r9) in r.
+ *               Return error_BAD_SWI for out of range SWIs.
+ *               Return an error block for a custom error.
+ **************************************************************************/
+_kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
+{
+    _kernel_oserror *err = NULL;
+    /*
+     * Wimp_LoadTemplate - Loads a template
+     *
+     * =>  R1 = window
+     *     R2 = data
+     *     R3 -> end
+     *     R4 = font_ref
+     *     R5 = name
+     *     R6 = context
+     * <=  R0 corrupted
+     *     R1 = used
+     *     R2 = data_used
+     *     R6 = context_out
+     */
+
+//    /* Input registers */
+//    Wimp_Window * window = (Wimp_Window *)regs->r[1];
+//    char * data = (char *)regs->r[2];
+//    uint8_t *end = (uint8_t *)regs->r[3];
+//    uint8_t * font_ref = (uint8_t *)regs->r[4];
+//    char * name = (char *)regs->r[5];
+//    int32_t context = (int32_t)regs->r[6];
+//    /* Output registers */
+//    int32_t used;
+//    int32_t data_used;
+//    int32_t context_out;
+//
+//    /* FIXME: SWI not yet implemented */
+//
+//    /* R0 corrupted */
+//    regs->r[1] = (int)used;  // .Int
+//    regs->r[2] = (int)data_used;  // .Int
+//    regs->r[6] = (int)context_out;  // .Int
+    return err;
+}
