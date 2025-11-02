@@ -1,0 +1,63 @@
+/*******************************************************************
+ * File:        ctrlstring
+ * Purpose:     Control terminated string processing
+ * Author:      Gerph
+ * Date:        2 Nov 2025
+ ******************************************************************/
+
+#include <stdbool.h>
+#include <string.h>
+#include <stdlib.h>
+
+#include "fortify.h"
+
+#include "ctrlstring.h"
+
+/*************************************************** Gerph *********
+ Function:      ctrlstrlen
+ Description:   Get the length of a control terminated string
+ Parameters:    ctrl-> the string to get length of
+ Returns:       length in bytes
+ ******************************************************************/
+int ctrlstrlen(ctrlstring_t ctrl)
+{
+    ctrlstring_t start = ctrl;
+    for (;*ctrl++ >= ' ';)
+        ; /* All in the loop */
+
+    return ctrl - start - 1;
+}
+
+
+/*************************************************** Gerph *********
+ Function:      ctrlstrdup
+ Description:   Duplicate a control terminated string into a 0-terminated string
+ Parameters:    ctrl-> the string to copy
+ Returns:       new string pointer, or NULL if failed
+ ******************************************************************/
+char *ctrlstrdup(ctrlstring_t ctrl)
+{
+    int len = ctrlstrlen(ctrl);
+    char *newstr = malloc(len + 1);
+    if (newstr == NULL)
+        return NULL;
+    memcpy(newstr, ctrl, len);
+    newstr[len] = '\0';
+    return newstr;
+}
+
+/*************************************************** Gerph *********
+ Function:      ctrlwildcarded
+ Description:   Check if the ctrl-terminated String is wildcarded
+ Parameters:    ctrl-> the ctrl terminated string
+ Returns:       true if wildcarded, false if not
+ ******************************************************************/
+bool ctrlwildcarded(ctrlstring_t ctrl)
+{
+    for (;*ctrl >= ' ';ctrl++)
+    {
+        if (*ctrl == '?' || *ctrl == '*')
+            return true;
+    }
+    return false;
+}

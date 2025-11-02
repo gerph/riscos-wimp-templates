@@ -1,0 +1,43 @@
+/*******************************************************************
+ * File:        ctrlstring
+ * Purpose:     Control/space terminated string processing
+ * Author:      Gerph
+ * Date:        05 Nov 2025
+ ******************************************************************/
+
+#ifndef CSSTRING_H
+#define CSSTRING_H
+
+#include <stdbool.h>
+
+typedef char *ctrlstring_t;       /* Control terminated string */
+
+/*************************************************** Gerph *********
+ Function:      ctrlstrlen
+ Description:   Get the length of a control terminated string
+ Parameters:    ctrl-> the string to get length of
+ Returns:       length in bytes
+ ******************************************************************/
+int ctrlstrlen(ctrlstring_t ctrl);
+
+
+/*************************************************** Gerph *********
+ Function:      ctrlstrdup
+ Description:   Duplicate a control terminated string into a 0-terminated string
+ Parameters:    ctrl-> the string to copy
+ Returns:       new string pointer, or NULL if failed
+ ******************************************************************/
+char *ctrlstrdup(ctrlstring_t ctrl);
+
+
+/*************************************************** Gerph *********
+ Function:      ctrlwildcarded
+ Description:   Check if the ctrl-terminated String is wildcarded
+ Parameters:    ctrl-> the ctrl terminated string
+ Returns:       true if wildcarded, false if not
+ ******************************************************************/
+bool ctrlwildcarded(ctrlstring_t ctrl);
+
+
+#endif
+

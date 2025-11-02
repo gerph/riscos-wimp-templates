@@ -4,8 +4,12 @@
  * Author:      Gerph
  ******************************************************************/
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
+
+#include "ctrlstring.h"
 
 #include "VersionNum"
 
@@ -17,10 +21,76 @@
 #define dprintf if (0) printf
 #endif
 
+typedef uint32_t fileoffset_t;
+
+#define TEMPLATE_DATA_TYPE_WINDOW (1)
+
+/* This is the file format - be aware of structure padding - use `packed` in future */
+typedef struct templateindexentry_s {
+    uint32_t         data_offset;
+    uint32_t         data_size;
+    uint32_t         data_type;
+    char             identifier[12]; /* ctrl-terminated */
+} templateindexentry_t;
+
+/* compile time check that the structure is the right size */
+struct ctc_templateindexentry {
+    char check[(sizeof(templateindexentry_t) == (3*4 + 12)) ? 1 : -1];
+};
+
 
 typedef struct opentemplate_s {
-    FILE *fh;
+    FILE                    *fh;
+    fileoffset_t             font_data_offset;
+    int                      nentries;
+    templateindexentry_t    *entries;
 } opentemplate_t;
+
+/* Value to return when we reached the end of file */
+#define READ_EOF (0x0)
+
+
+/*************************************************** Gerph *********
+ Function:      templates_read_word
+ Description:   Read a 32bit value from the open template file
+ Parameters:    ot-> the template we are reading
+ Returns:       the word we read
+ ******************************************************************/
+uint32_t templates_read_word(opentemplate_t *ot)
+{
+    uint32_t word;
+    int read = fread(&word, 1, sizeof(word), ot->fh);
+    if (read != sizeof(word))
+        return READ_EOF;
+    return word;
+}
+
+/*************************************************** Gerph *********
+ Function:      templates_read
+ Description:   Read an arbitrary size of data from the open template file
+ Parameters:    ot-> the template we are reading
+ Returns:       the amount of data we read
+ ******************************************************************/
+uint32_t templates_read(opentemplate_t *ot, void *dest, int size)
+{
+    int read = fread(dest, 1, size, ot->fh);
+    return read;
+}
+
+/*************************************************** Gerph *********
+ Function:      templates_seek
+ Description:   Seek to a place within the file, using the SEEK_* types
+ Parameters:    ot-> the template we are reading
+                offset = where to seek
+                how = how to seek: SEEK_SET = absolute
+                                   SEEK_CUR = relative to current
+                                   SEEK_END = relative to end
+ Returns:       error code
+ ******************************************************************/
+int templates_seek(opentemplate_t *ot, fileoffset_t offset, int how)
+{
+    return fseek(ot->fh, offset, how);
+}
 
 
 /*************************************************** Gerph *********
@@ -49,7 +119,85 @@ opentemplate_t *templates_open(const char *filename)
     dprintf("templates_open: Opened template file '%s'\n", filename);
     ot->fh = fh;
 
+    /* First word should be font data offset, then 3 words of 0s */
+    ot->font_data_offset = templates_read_word(ot);
+    if (ot->font_data_offset == 0xFFFFFFFFlu)
+        ot->font_data_offset = 0;
+    dprintf("Font data offset = &%05x\n", ot->font_data_offset);
+
+    if (templates_read_word(ot) != 0 ||
+        templates_read_word(ot) != 0 ||
+        templates_read_word(ot) != 0)
+    {
+        goto failed;
+    }
+
+    {
+        /* Count the number of entries in the header */
+        int nentries = 0;
+        int size;
+        templateindexentry_t *entries;
+        while (1)
+        {
+            uint32_t data_offset = templates_read_word(ot);
+            if (data_offset == 0)
+                break;
+            templates_seek(ot, sizeof(templateindexentry_t) - 4, SEEK_CUR);
+            nentries++;
+        }
+
+        /* We've now counted the entries; so we can read the lot into out workspace */
+        size = sizeof(templateindexentry_t) * nentries;
+        entries = malloc(size);
+        if (entries == NULL)
+            goto failed;
+
+        templates_seek(ot, 16, SEEK_SET);
+        ot->entries = entries;
+        ot->nentries = nentries;
+        if (templates_read(ot, entries, size) != size)
+        {
+            dprintf("Could not read all the template data; give up\n");
+            goto failed;
+        }
+
+        /* Validate all the entries */
+        {
+            int i;
+            for (i =0; i < ot->nentries; i++)
+            {
+                int len = ctrlstrlen(ot->entries[i].identifier);
+                if (len > 11)
+                {
+                    dprintf("Invalid length of the identifier in template %i\n", i);
+                    goto failed;
+                }
+                ot->entries[i].identifier[len] = '\0';
+            }
+        }
+
+        {
+            int i;
+            dprintf("templates_open: Read header...\n");
+            for (i =0; i < ot->nentries; i++)
+            {
+                dprintf("%3i : offset &%05x, size &%04x, type %u, identifier %s\n",
+                        i,
+                        ot->entries[i].data_offset,
+                        ot->entries[i].data_size,
+                        ot->entries[i].data_type,
+                        ot->entries[i].identifier);
+            }
+        }
+    }
+
     return ot;
+
+failed:
+    fclose(ot->fh);
+    free(ot);
+    /* FIXME: Better way of reporting errors ? */
+    return NULL;
 }
 
 
