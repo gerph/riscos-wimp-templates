@@ -28,6 +28,39 @@ int ctrlstrlen(ctrlstring_t ctrl)
     return ctrl - start - 1;
 }
 
+/*************************************************** Gerph *********
+ Function:      ctrlstrcmp
+ Description:   Compare two control terminated strings
+ Parameters:    ctrl1-> the first string
+                ctrl2-> the second string
+ Returns:       0 if same, or -ve if less, or +ve if more
+ ******************************************************************/
+int ctrlstrcmp(ctrlstring_t ctrl1, ctrlstring_t ctrl2)
+{
+    while (1)
+    {
+        int c1 = *ctrl1;
+        int c2 = *ctrl2;
+        int diff;
+        if (c1 < ' ')
+            c1 = '\0';
+        if (c2 < ' ')
+            c2 = '\0';
+        diff = c1 - c2;
+        if (diff != 0)
+        {
+            return diff;
+        }
+
+        if (c1 == '\0')
+            break;
+        ctrl1++;
+        ctrl2++;
+    }
+
+    return 0;
+}
+
 
 /*************************************************** Gerph *********
  Function:      ctrlstrdup

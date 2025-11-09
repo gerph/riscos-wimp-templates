@@ -41,6 +41,25 @@ int main(int argc, char *argv[])
         printf("Failed to open file\n");
     }
 
+    {
+        templateerror_t terr;
+        uint8_t window[1024];
+        uint8_t indirect[1024];
+        bufferdata_t bufwin;
+        bufferdata_t bufind;
+
+        bufferdata_init(&bufwin, &window[0], sizeof(window));
+        bufferdata_init(&bufind, &indirect[0], sizeof(indirect));
+
+        terr = templates_readtemplate(ot, 0, &bufwin, &bufind);
+        if (terr)
+            printf("Error reading template: %i\n", terr);
+        printf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
+        printf("window buffer: %p\n", window);
+        printf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
+        printf("indirect buffer: %p\n", indirect);
+    }
+
     templates_close(ot);
 
     exit(EXIT_SUCCESS);

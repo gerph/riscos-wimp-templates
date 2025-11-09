@@ -11,6 +11,7 @@
 #include <stdint.h>
 
 #include "ctrlstring.h"
+#include "bufferdata.h"
 
 #define DEBUG
 
@@ -47,6 +48,12 @@ struct opentemplate_s {
 
 typedef struct opentemplate_s opentemplate_t;
 
+typedef enum templateerror_e {
+    TE_OK,
+    TE_EOF
+} templateerror_t;
+
+
 /* Value to return when we reached the end of file */
 #define READ_EOF (0x0)
 
@@ -66,5 +73,29 @@ opentemplate_t *templates_open(const char *filename);
  Returns:       0 for success, 1 for failure
  ******************************************************************/
 int templates_close(opentemplate_t *ot);
+
+
+/*************************************************** Gerph *********
+ Function:      templates_findidentifier
+ Description:   Find a template block by its string identifier
+ Parameters:    ot-> the template file we are operating on
+                ctrl-> identifier we are finding (ctrl-terminated)
+ Returns:       index to the template to use, or -1 if invalid
+ ******************************************************************/
+int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl);
+
+
+/*************************************************** Gerph *********
+ Function:      templates_readtemplate
+ Description:   Read a template into a user buffer
+ Parameters:    ot-> the template file we are operating on
+                index = the index of the template we're reading
+                bufwin-> the buffer to write the window into
+                bufind-> the buffer to write indirected data into
+ Returns:       template error code
+ ******************************************************************/
+templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
+                                       bufferdata_t *bufwin,
+                                       bufferdata_t *bufind);
 
 #endif

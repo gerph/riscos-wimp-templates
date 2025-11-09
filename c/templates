@@ -12,6 +12,8 @@
 
 #include "ctrlstring.h"
 #include "templates.h"
+#include "bufferdata.h"
+#include "types.h"
 
 #define DEBUG
 
@@ -147,12 +149,15 @@ opentemplate_t *templates_open(const char *filename)
                     dprintf("Invalid length of the identifier in template %i\n", i);
                     goto failed;
                 }
+                /* FIXME: identifiers should be allowed to be 12 character long, unterminated */
+
                 ot->entries[i].identifier[len] = '\0';
                 /* FIXME: Check the offset and length are in the file */
                 /* FIXME: Should we check that the template names aren't repeated? */
             }
         }
 
+#ifdef DEBUG
         {
             int i;
             dprintf("templates_open: Read header...\n");
@@ -166,6 +171,7 @@ opentemplate_t *templates_open(const char *filename)
                         ot->entries[i].identifier);
             }
         }
+#endif
     }
 
     /* Linked to our tracked chain */
@@ -211,3 +217,110 @@ int templates_close(opentemplate_t *ot)
     dprintf("File handle is not open - cannot close\n");
     return 1;
 }
+
+
+/*************************************************** Gerph *********
+ Function:      templates_findidentifier
+ Description:   Find a template block by its string identifier
+ Parameters:    ot-> the template file we are operating on
+                ctrl-> identifier we are finding (ctrl-terminated)
+ Returns:       index to the template to use, or -1 if invalid
+ ******************************************************************/
+int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl)
+{
+    int i;
+    for (i=0; i<ot->nentries; i++)
+    {
+        templateindexentry_t *ientry = &ot->entries[i];
+        if (ctrlstrcmp(ientry->identifier, ctrl) == 0)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+
+/*************************************************** Gerph *********
+ Function:      templates_writeicondata
+ Description:   Write an icondata into the user's buffer
+ Parameters:    ot-> the template we are operating on
+                bufwin-> the buffer to write the window into
+                bufind-> the buffer to write indirected data into
+                icondata-> the icon's data
+ Returns:       template error code
+ ******************************************************************/
+static templateerror_t templates_writeicondata(opentemplate_t *ot,
+                                               bufferdata_t *bufwin,
+                                               bufferdata_t *bufind,
+                                               Wimp_IconFlags iconflags,
+                                               Wimp_IconData *icondata)
+{
+    /* FIXME: Implement properly */
+    bufferdata_write_bytes(bufwin, icondata, sizeof(*icondata));
+
+    return TE_OK;
+}
+
+/*************************************************** Gerph *********
+ Function:      templates_readtemplate
+ Description:   Read a template into a user buffer
+ Parameters:    ot-> the template file we are operating on
+                index = the index of the template we're reading
+                bufwin-> the buffer to write the window into
+                bufind-> the buffer to write indirected data into
+ Returns:       template error code
+ ******************************************************************/
+templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
+                                       bufferdata_t *bufwin,
+                                       bufferdata_t *bufind)
+{
+    int size = ot->entries[index].data_size;
+    int offset = ot->entries[index].data_offset;
+    Wimp_Window win;
+    int read;
+    int iconnum;
+    templates_seek(ot, offset, SEEK_SET);
+
+    read = templates_read(ot, &win, Wimp_WindowHeaderSize);
+    if (read != Wimp_WindowHeaderSize)
+        return TE_EOF;
+    offset += offset;
+
+    bufferdata_write_bytes(bufwin, &win.visible, sizeof(win.visible));
+    bufferdata_write_bytes(bufwin, &win.xscroll, sizeof(win.xscroll) + sizeof(win.yscroll));
+    bufferdata_write_word(bufwin, 0xFFFFFFFF); /* Always force window to top */
+    bufferdata_write_word(bufwin, win.flags);
+    bufferdata_write_bytes(bufwin, &win.title_fg, sizeof(win.title_fg) * 7 + sizeof(win.extra_flags)); /* The colours */
+    bufferdata_write_bytes(bufwin, &win.extent, sizeof(win.extent));
+    bufferdata_write_bytes(bufwin, &win.title_flags, sizeof(win.title_flags) * 2); /* Title + work area flags */
+    bufferdata_write_word(bufwin, 1); /* FIXME: Should I be forcing sprite area to be the Wimp sprite pool? */
+    bufferdata_write_bytes(bufwin, &win.xmin, sizeof(win.xmin) * 2);
+
+    /* FIXME: Title data */
+    //Wimp_IconData title_data;
+    templates_writeicondata(ot, bufwin, bufind, win.title_flags, &win.title_data);
+
+    bufferdata_write_word(bufwin, win.icon_count);
+    for (iconnum=0; iconnum < win.icon_count; iconnum++)
+    {
+        Wimp_Icon *icon = &win.icons[0];
+        templates_seek(ot, offset, SEEK_SET);
+        read = templates_read(ot, icon, sizeof(Wimp_Icon));
+        if (read != sizeof(Wimp_Icon))
+            return TE_EOF;
+        offset += read;
+
+        bufferdata_write_bytes(bufwin, &icon->extent, sizeof(icon->extent));
+        bufferdata_write_word(bufwin, icon->flags);
+
+        /* Handle the icon data */
+        templates_writeicondata(ot, bufwin, bufind, icon->flags, &icon->data);
+    }
+
+    return TE_OK;
+}
+
+
+
+

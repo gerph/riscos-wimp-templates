@@ -33,7 +33,8 @@ CDEFINES   =
 LIBS       = ${CLIB}
 
 # Objects to build, using the format o.<name> (will be varied for build type)
-OBJS       = o.ctrlstring \
+OBJS       = o.bufferdata \
+			 o.ctrlstring \
 			 o.templates \
 			 o.main
 

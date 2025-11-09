@@ -1,0 +1,101 @@
+/*******************************************************************
+ * File:        types
+ * Purpose:     OSLib types used by the Window template load
+ * Author:      Gerph
+ * Date:        09 Nov 2025
+ ******************************************************************/
+
+#ifndef TYPES_H
+#define TYPES_H
+
+#include <stdint.h>
+
+typedef uint32_t addr32_t; /* 32bit address pointer */
+
+
+#define Wimp_TemplateNameLimit                   (12)
+#define Wimp_IconNameLimit                       (12)
+#define Wimp_WindowHeaderSize                    (sizeof(Wimp_Window) - sizeof(Wimp_Icon))
+
+struct OS_Box_s {
+    int32_t x0;
+    int32_t y0;
+    int32_t x1;
+    int32_t y1;
+};
+typedef struct OS_Box_s OS_Box;
+
+typedef addr32_t Wimp_W;
+typedef addr32_t OSSpriteOp_Id;
+
+typedef uint32_t Wimp_IconFlags;
+
+typedef union Wimp_IconData_u {
+    uint8_t text[Wimp_IconNameLimit];
+    uint8_t sprite[Wimp_IconNameLimit];
+    uint8_t text_and_sprite[Wimp_IconNameLimit];
+    struct {
+        addr32_t text;
+        addr32_t validation;
+        int32_t size;
+    } indirected_text;
+    struct {
+        OSSpriteOp_Id id;
+        addr32_t area;
+        int32_t size;
+    } indirected_sprite;
+    struct {
+        addr32_t text;
+        addr32_t validation;
+        int32_t size;
+    } indirected_text_and_sprite;
+} Wimp_IconData;
+
+struct Wimp_Icon_s {
+    OS_Box extent;
+    Wimp_IconFlags flags;
+    Wimp_IconData data;
+};
+typedef struct Wimp_Icon_s Wimp_Icon;
+
+typedef uint8_t Wimp_Colour;
+typedef uint32_t Wimp_WindowFlags;
+typedef uint8_t Wimp_ExtraWindowFlags;
+
+struct Wimp_Window_s {
+    OS_Box visible;
+    int32_t xscroll;
+    int32_t yscroll;
+    Wimp_W next;
+    Wimp_WindowFlags flags;
+    Wimp_Colour title_fg;
+    Wimp_Colour title_bg;
+    Wimp_Colour work_fg;
+    Wimp_Colour work_bg;
+    Wimp_Colour scroll_outer;
+    Wimp_Colour scroll_inner;
+    Wimp_Colour highlight_bg;
+    Wimp_ExtraWindowFlags extra_flags;
+    OS_Box extent;
+    Wimp_IconFlags title_flags;
+    Wimp_IconFlags work_flags;
+    addr32_t sprite_area;
+    int16_t xmin;
+    int16_t ymin;
+    Wimp_IconData title_data;
+    int32_t icon_count;
+    Wimp_Icon icons[1];
+};
+typedef struct Wimp_Window_s Wimp_Window;
+
+
+/* compile time check that the structure is the right size */
+struct ctc_wimp_icon {
+    char check[(sizeof(Wimp_Icon) == 32)];
+};
+struct ctc_wimp_window {
+    char check[(sizeof(Wimp_Window) == 88 + sizeof(Wimp_Icon))];
+};
+
+
+#endif

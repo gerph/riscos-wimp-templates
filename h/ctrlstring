@@ -22,6 +22,16 @@ int ctrlstrlen(ctrlstring_t ctrl);
 
 
 /*************************************************** Gerph *********
+ Function:      ctrlstrcmp
+ Description:   Compare two control terminated strings
+ Parameters:    ctrl1-> the first string
+                ctrl2-> the second string
+ Returns:       0 if same, or -ve if less, or +ve if more
+ ******************************************************************/
+int ctrlstrcmp(ctrlstring_t ctrl1, ctrlstring_t ctrl2);
+
+
+/*************************************************** Gerph *********
  Function:      ctrlstrdup
  Description:   Duplicate a control terminated string into a 0-terminated string
  Parameters:    ctrl-> the string to copy
