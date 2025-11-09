@@ -240,6 +240,72 @@ int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl)
     return -1;
 }
 
+typedef struct loadtemplatedata_s {
+    opentemplate_t *ot;
+    bufferdata_t *bufwin;
+    bufferdata_t *bufind;
+    int base_offset;
+} loadtemplatedata_t;
+
+
+/*************************************************** Gerph *********
+ Function:      templates_stringindirect
+ Description:   Copy a string from the templates file to the indirect buffer, with length
+ Parameters:    ltd-> load template data structure
+                ind_offset = indirect data offset from window base offset
+                length = the size in the indirect buffer
+                textp-> where to store the indirect buffer text (or NULL if not written)
+ Returns:       template error code
+ ******************************************************************/
+templateerror_t templates_stringindirect(loadtemplatedata_t *ltd,
+                                         int ind_offset,
+                                         int length,
+                                         uint8_t **textp)
+{
+    int wrote = 0;
+    uint8_t *text = bufferdata_address(ltd->bufind, 0, true);
+    *textp = NULL;
+
+    templates_seek(ltd->ot, ltd->base_offset + ind_offset, SEEK_SET);
+    dprintf("Reading indirect string from offset &%x to address %p\n", ltd->base_offset + ind_offset, text);
+    while (1)
+    {
+        int c = fgetc(ltd->ot->fh);
+        if (c==EOF)
+            return TE_EOF;
+
+        if (c < 32)
+            c = 0;
+        if (length == -1 || length - 1 <= wrote)
+        {
+            if (length != -1 && length - 1 == wrote)
+            {
+                /* last byte, so we terminate */
+                int zero = 0;
+                bufferdata_write_bytes(ltd->bufind, &zero, 1);
+            }
+            else
+            {
+                bufferdata_write_bytes(ltd->bufind, &c, 1);
+            }
+            wrote += 1;
+        }
+        if (c == 0)
+            break;
+    }
+    if (length != -1 && wrote != length)
+    {
+        /* Write padding to the end of the indirected data field */
+        printf("Padding by %i bytes\n", length - wrote);
+        bufferdata_write_bytespadded(ltd->bufind, NULL, 0, length - wrote);
+    }
+
+    if (!bufferdata_failed(ltd->bufind))
+        *textp = text;
+
+    return TE_OK;
+}
+
 
 /*************************************************** Gerph *********
  Function:      templates_writeicondata
@@ -250,14 +316,126 @@ int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl)
                 icondata-> the icon's data
  Returns:       template error code
  ******************************************************************/
-static templateerror_t templates_writeicondata(opentemplate_t *ot,
-                                               bufferdata_t *bufwin,
-                                               bufferdata_t *bufind,
+static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
                                                Wimp_IconFlags iconflags,
                                                Wimp_IconData *icondata)
 {
-    /* FIXME: Implement properly */
-    bufferdata_write_bytes(bufwin, icondata, sizeof(*icondata));
+    templateerror_t terr;
+
+    dprintf("Processing icon, flags &%08x\n", iconflags);
+
+    if ( (iconflags & (Wimp_IconText | Wimp_IconSprite)) &&
+         (iconflags & Wimp_IconIndirected) )
+    {
+        // Fixup if the icon contains text/sprite and is indirected.
+        int text_offset = icondata->indirected_text.text;
+        int validation_offset = icondata->indirected_text.validation;
+        int32_t length = icondata->indirected_text.size;
+        uint8_t *text = NULL;
+        uint8_t *validation = NULL;
+
+        if ( (iconflags & (Wimp_IconText | Wimp_IconSprite)) == Wimp_IconSprite )
+        {
+            // It's an indirected sprite, so it might have a sprite name, or might be
+            // a sprite pointer. It's almost always going to be a sprite name, but we
+            // check nonetheless.
+            if (length == 0)
+                // It's a sprite pointer; flag as an invalid text_offset
+                text_offset = 0;
+        }
+
+        if (text_offset != 0)
+        {
+            terr = templates_stringindirect(ltd, text_offset, length, &text);
+            if (terr != TE_OK)
+                return terr;
+        }
+
+        if (iconflags & Wimp_IconText)
+        {
+            if (validation_offset != 0)
+            {
+                terr = templates_stringindirect(ltd, validation_offset, -1, &validation);
+                if (terr != TE_OK)
+                    return terr;
+            }
+        }
+
+        dprintf("  Indirect Text(%i): %s\n", length, text ? (char*)text : "<not written>");
+        dprintf("  Validation: %s\n", validation ? (char*)validation : "<not written>");
+
+    }
+
+/*
+    if iconflags & (Wimp_IconText | Wimp_IconSprite) and \
+       iconflags & Wimp_IconIndirected:
+
+        (text_offset, validation_offset, length) = struct.unpack('<LLL', icondata)
+
+        text = None
+        validation = None
+        if iconflags & (Wimp_IconText | Wimp_IconSprite) == \
+                Wimp_IconSprite:
+            # It's an indirected sprite, so it might have a sprite name, or might be
+            # a sprite pointer. It's almost always going to be a sprite name, but we
+            # check nonetheless.
+            if length == 0:
+                # It's a sprite pointer; flag as an invalid text_offset
+                text_offset = 0
+
+        if text_offset != 0:
+            self.seek(params['template_fileptr'] + text_offset)
+            text = self.read_string()
+
+        if iconflags & Wimp_IconText:
+            if validation_offset != 0:
+                self.seek(params['template_fileptr'] + validation_offset)
+                validation = self.read_string()
+        if self.debug_wimptemplate:
+            print("  Indirect Text(%i): %r" % (length, text))
+            print("  Validation: %r" % (validation,))
+
+        # Put the text into the workspace
+        if text is not None:
+            space_needed = length + 1
+            if params['workspace_size_used'] + space_needed <= params['workspace_size']:
+                # We can fit the data in the buffer.
+                workspace[params['workspace_size_used']] = text
+                text_offset = workspace.address + params['workspace_size_used']
+            else:
+                if self.debug_wimptemplate:
+                    print("  - does not fit in the workspace block")
+                # FIXME: If it does not fit, should we error?
+            params['workspace_size_used'] += space_needed
+
+        # Put the validation into the workspace
+        if validation is not None:
+            space_needed = len(validation) + 1
+            if params['workspace_size_used'] + space_needed <= params['workspace_size']:
+                # We can fit the data in the buffer.
+                workspace[params['workspace_size_used']] = validation
+                validation_offset = workspace.address + params['workspace_size_used']
+            else:
+                if self.debug_wimptemplate:
+                    print("  - does not fit in the workspace block")
+                # FIXME: If it does not fit, should we error?
+            params['workspace_size_used'] += space_needed
+
+        # FIXME: We don't support fonts here?
+
+        # Rebuild the icon data
+        if self.debug_wimptemplate:
+            print("  Rebuilt as: &%08x, &%08x, %i" % (text_offset, validation_offset, length))
+        icondata = struct.pack("<LLL", text_offset, validation_offset, length)
+
+    elif iconflags & Wimp_IconText:
+        # For debugging
+        if self.debug_wimptemplate:
+            text = re.sub('[\x00-\x1f].*$', '', icondata, flags=re.DOTALL)
+            print("  Text: %r" % (text,))
+*/
+
+    bufferdata_write_bytes(ltd->bufwin, icondata, sizeof(*icondata));
 
     return TE_OK;
 }
@@ -280,12 +458,12 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
     Wimp_Window win;
     int read;
     int iconnum;
+    loadtemplatedata_t ltd;
     templates_seek(ot, offset, SEEK_SET);
 
     read = templates_read(ot, &win, Wimp_WindowHeaderSize);
     if (read != Wimp_WindowHeaderSize)
         return TE_EOF;
-    offset += offset;
 
     bufferdata_write_bytes(bufwin, &win.visible, sizeof(win.visible));
     bufferdata_write_bytes(bufwin, &win.xscroll, sizeof(win.xscroll) + sizeof(win.yscroll));
@@ -297,9 +475,16 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
     bufferdata_write_word(bufwin, 1); /* FIXME: Should I be forcing sprite area to be the Wimp sprite pool? */
     bufferdata_write_bytes(bufwin, &win.xmin, sizeof(win.xmin) * 2);
 
-    /* FIXME: Title data */
-    //Wimp_IconData title_data;
-    templates_writeicondata(ot, bufwin, bufind, win.title_flags, &win.title_data);
+    ltd.ot = ot;
+    ltd.bufwin = bufwin;
+    ltd.bufind = bufind;
+    ltd.base_offset = offset;
+    dprintf("Writing window data from template offset &%x, %i icons\n", offset, win.icon_count);
+    dprintf("window base offset = &%x\n",ltd.base_offset);
+    /* FIXME: The font data will need passing in too */
+
+    /* Fixup title data */
+    templates_writeicondata(&ltd, win.title_flags, &win.title_data);
 
     bufferdata_write_word(bufwin, win.icon_count);
     for (iconnum=0; iconnum < win.icon_count; iconnum++)
@@ -315,7 +500,7 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
         bufferdata_write_word(bufwin, icon->flags);
 
         /* Handle the icon data */
-        templates_writeicondata(ot, bufwin, bufind, icon->flags, &icon->data);
+        templates_writeicondata(&ltd, icon->flags, &icon->data);
     }
 
     return TE_OK;

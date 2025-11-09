@@ -17,6 +17,15 @@ typedef uint32_t addr32_t; /* 32bit address pointer */
 #define Wimp_IconNameLimit                       (12)
 #define Wimp_WindowHeaderSize                    (sizeof(Wimp_Window) - sizeof(Wimp_Icon))
 
+/* Icon flags */
+#define Wimp_IconText                            ((Wimp_IconFlags)(1<<0))
+#define Wimp_IconSprite                          ((Wimp_IconFlags)(1<<1))
+#define Wimp_IconAntiAliased                     ((Wimp_IconFlags)(1<<6))
+#define Wimp_IconIndirected                      ((Wimp_IconFlags)(1<<8))
+#define Wimp_IconFontHandle                      ((Wimp_IconFlags)0xff000000) /* shift Font Handle bits by Wimp_IconFontHandleShift */
+#define Wimp_IconFontHandleShift                 (24)
+
+
 struct OS_Box_s {
     int32_t x0;
     int32_t y0;
