@@ -35,10 +35,11 @@ LIBS       =
 CDEFINES   =
 
 # Objects to build, using the format o.<name> (will be varied for build type)
-OBJS       = o.modhead \
-		     o.templates \
-		     o.ctrlstring \
-			 o.module
+OBJS       = o.bufferdata \
+             o.modhead \
+             o.templates \
+             o.ctrlstring \
+             o.module
 
 # No fortify present (but we understand it)
 FORTIFY = no

@@ -43,8 +43,8 @@ int main(int argc, char *argv[])
 
     {
         templateerror_t terr;
-        uint8_t window[1024];
-        uint8_t indirect[1024];
+        uint8_t window[1024 * 4];
+        uint8_t indirect[1024 * 4];
         bufferdata_t bufwin;
         bufferdata_t bufind;
 
@@ -54,8 +54,10 @@ int main(int argc, char *argv[])
         terr = templates_readtemplate(ot, 0, &bufwin, &bufind);
         if (terr)
             printf("Error reading template: %i\n", terr);
+        printf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
         printf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
         printf("window buffer: %p\n", window);
+        printf("indirect buffering state: %s\n", bufferdata_failed(&bufind) ? "FAIL" : "ok");
         printf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
         printf("indirect buffer: %p\n", indirect);
     }
