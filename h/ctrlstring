@@ -30,6 +30,15 @@ int ctrlstrlen(ctrlstring_t ctrl);
  ******************************************************************/
 int ctrlstrcmp(ctrlstring_t ctrl1, ctrlstring_t ctrl2);
 
+/*************************************************** Gerph *********
+ Function:      ctrlstricmp_wt
+ Description:   Compare two control terminated strings (insensitive for the Wimp templates)
+ Parameters:    ctrl1-> the first string
+                ctrl2-> the second string
+ Returns:       0 if same, or -ve if less, or +ve if more
+ ******************************************************************/
+int ctrlstricmp_wt(ctrlstring_t ctrl1, ctrlstring_t ctrl2);
+
 
 /*************************************************** Gerph *********
  Function:      ctrlstrdup

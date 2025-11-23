@@ -1,0 +1,82 @@
+/*******************************************************************
+ * File:     wildcard
+ * Purpose:  Wildcard matching for Wimp templates
+ * Author:   Gerph
+ * Date:     23 Nov 2025
+ ******************************************************************/
+
+#include <stdint.h>
+#include <stdio.h>
+#include "wildcard.h"
+
+/* Define this to debug this file */
+#define DEBUG
+
+
+#ifdef DEBUG
+#define dprintf if (1) printf
+#else
+#define dprintf if (0) printf
+#endif
+/*************************************************** Gerph *********
+ Function:     wildmatch_wt
+ Description:  Check whether we match a wildcard (case insensitive,
+               for wimp templates)
+ Parameters:   wild-> the wildcard to match with, terminated by
+                      control characters
+               str-> the string to match, terminated by control
+                     chars
+ Returns:      1 if matched, 0 if no match
+ ******************************************************************/
+int wildmatch_wt(ctrlstring_t wild, ctrlstring_t str)
+{
+    dprintf("Wild %s against %s\n", wild, str);
+    do
+    {
+        uint32_t w = *wild;
+        uint32_t s = *str;
+
+        if (w <= ' ')
+            w = '\0';
+        if (s <= ' ')
+            s = '\0';
+
+        if (s == '\0')
+        {
+            if (w == '*')
+            {
+                wild++;
+                continue;
+            }
+            if (w == '\0')
+                return 1;       /* Equal */
+        }
+
+        if (w == '\0')
+            return 0;           /* Not equal */
+
+        /* Wimp template matching uses &DF to compare - ie clear bit 5, but I'll use a simple ASCII check instead */
+        if (w >= 'A' && w <= 'Z')
+            w = w + 32;
+        if (s >= 'A' && s <= 'Z')
+            s = s + 32;
+
+        dprintf("  compare %i %c against %i %c\n", w, w >= 32 ? w : '?', s, s>=32 ? s : '?');
+
+        if (s != '*')
+        {
+            if (w == s || w == '?')
+            {
+                wild++;
+                str++;
+                continue;
+            }
+        }
+        if (w != '*')
+            return 0;           /* Not equal */
+
+        if (wildmatch_wt(wild + 1, str))
+            return 1;
+        return wildmatch_wt(wild, str + 1);
+    } while (1);
+}

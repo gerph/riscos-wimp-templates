@@ -61,6 +61,44 @@ int ctrlstrcmp(ctrlstring_t ctrl1, ctrlstring_t ctrl2)
     return 0;
 }
 
+/*************************************************** Gerph *********
+ Function:      ctrlstricmp_wt
+ Description:   Compare two control terminated strings (insensitive for the Wimp templates)
+ Parameters:    ctrl1-> the first string
+                ctrl2-> the second string
+ Returns:       0 if same, or -ve if less, or +ve if more
+ ******************************************************************/
+int ctrlstricmp_wt(ctrlstring_t ctrl1, ctrlstring_t ctrl2)
+{
+    while (1)
+    {
+        int c1 = *ctrl1;
+        int c2 = *ctrl2;
+        int diff;
+        if (c1 < ' ')
+            c1 = '\0';
+        if (c2 < ' ')
+            c2 = '\0';
+
+        /* Wimp template matching uses &DF to compare - ie clear bit 5 */
+        c1 = c1 & 0xDF;
+        c2 = c2 & 0xDF;
+
+        diff = c1 - c2;
+        if (diff != 0)
+        {
+            return diff;
+        }
+
+        if (c1 == '\0')
+            break;
+        ctrl1++;
+        ctrl2++;
+    }
+
+    return 0;
+}
+
 
 /*************************************************** Gerph *********
  Function:      ctrlstrdup

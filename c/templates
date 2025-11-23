@@ -13,7 +13,11 @@
 #include "ctrlstring.h"
 #include "templates.h"
 #include "bufferdata.h"
+#include "wildcard.h"
 #include "types.h"
+
+/* Whether wildcards are supported by identifier lookups */
+#define SUPPORT_WILDCARDS
 
 #define DEBUG
 
@@ -234,10 +238,20 @@ int templates_close(opentemplate_t *ot)
 int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl)
 {
     int i;
+    /* NOTE: In s/Wimp06 `matchnames` the comparison appears to be
+     *       case insensitive - matches are with the EQ state afte
+     *       a '#' character check, and uses a shortcut with TST &DF
+     *       to ignore the case (and some non-alphbetic characters).
+     *       For example '[' and '{' will be identical.
+     */
     for (i=0; i<ot->nentries; i++)
     {
         templateindexentry_t *ientry = &ot->entries[i];
-        if (ctrlstrcmp(ientry->identifier, ctrl) == 0)
+#ifdef SUPPORT_WILDCARDS
+        if (wildmatch_wt(ctrl, ientry->identifier) == 1)
+#else
+        if (ctrlstricmp_wt(ctrl, ientry->identifier) == 0)
+#endif
         {
             return i;
         }
