@@ -259,6 +259,21 @@ int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl)
     return -1;
 }
 
+/*************************************************** Gerph *********
+ Function:      templates_indextoname
+ Description:   Convert a template index into a template name
+ Parameters:    ot-> the template file we are operating on
+                index = template number to find
+ Returns:       pointer to the template identifier, or NULL if invalid
+ ******************************************************************/
+const char *templates_indextoname(opentemplate_t *ot, int index)
+{
+    if (index < 0 || index > ot->nentries)
+        return NULL; /* Not found - there isn't any template with that index */
+    return ot->entries[index].identifier;
+}
+
+
 typedef struct loadtemplatedata_s {
     opentemplate_t *ot;
     bufferdata_t *bufwin;
