@@ -10,7 +10,7 @@
 #include "wildcard.h"
 
 /* Define this to debug this file */
-#define DEBUG
+//#define DEBUG
 
 
 #ifdef DEBUG
