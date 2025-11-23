@@ -1,0 +1,23 @@
+REM> Test-load-template
+REM Test that the dummy module template loading works.
+
+DIM win% 4096
+DIM ind% 4096
+DIM tempname% 12
+
+SYS "WimpTemplates_OpenTemplate",, "testdata.templates.info"
+$(tempname%) = "*"
+SYS "WimpTemplates_LoadTemplate",, win%, ind%,ind%+4096, -1, tempname%, 0 TO ,reqwin%, indend%,r3,r4,name$, next%
+
+PRINT "Required space: &";~reqwin%
+PRINT "Indirect end: &";~indend%
+PRINT "Name: ";name$
+PRINT "Next: ";next%
+
+PRINT "Create window"
+SYS "Wimp_CreateWindow",,win% TO winh%
+PRINT "Got handle ";~winh%
+!win%=winh%:SYS "Wimp_GetWindowState",,win%
+!win%=winh%:SYS "Wimp_OpenWindow",,win%
+PRINT "Opened"
+

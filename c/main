@@ -29,7 +29,7 @@ int main(int argc, char *argv[])
     printf("WimpTemplates " Module_FullVersionAndDate "\n");
     if (argc < 2)
     {
-        printf("Syntax: WimpTemplates <filename>\n");
+        printf("Syntax: WimpTemplates <filename> [<template-name>]\n");
         exit(1);
     }
 
@@ -39,6 +39,46 @@ int main(int argc, char *argv[])
     if (!ot)
     {
         printf("Failed to open file\n");
+    }
+
+    {
+        templateerror_t terr;
+        uint8_t window[1024 * 4];
+        uint8_t indirect[1024 * 4];
+        char *template_name = NULL;
+        int template_num = 0;
+        bufferdata_t bufwin;
+        bufferdata_t bufind;
+
+        if (argc > 2)
+        {
+            template_name = argv[2];
+        }
+
+        bufferdata_init(&bufwin, &window[0], sizeof(window));
+        bufferdata_init(&bufind, &indirect[0], sizeof(indirect));
+
+        if (template_name != NULL)
+        {
+            printf("Finding template '%s'\n", template_name);
+            template_num = templates_findidentifier(ot, template_name);
+            if (template_num == -1)
+            {
+                printf("Error finding identifier '%s'\n", template_name);
+                exit(1);
+            }
+            printf("  Template number %i\n", template_num);
+        }
+
+        terr = templates_readtemplate(ot, template_num, &bufwin, &bufind);
+        if (terr)
+            printf("Error reading template #%i: %i\n", template_num, terr);
+        printf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
+        printf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
+        printf("window buffer: %p\n", window);
+        printf("indirect buffering state: %s\n", bufferdata_failed(&bufind) ? "FAIL" : "ok");
+        printf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
+        printf("indirect buffer: %p\n", indirect);
     }
 
     templates_close(ot);

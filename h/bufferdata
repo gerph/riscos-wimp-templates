@@ -1,0 +1,266 @@
+/*******************************************************************
+ * File:        bufferdata
+ * Purpose:     Structured population of buffers in memory (converted from Python)
+ *
+ *    Buffered data for delivering chunks of information to an output.
+ *
+ *    The buffered data is intended to be used with collection of objects which
+ *    need to be written as blocks of data, and should not exceed a set boundary.
+ *
+ *    Typical cases might be interfaces like GBPB listing of files, or TaskManager
+ *    task enumeration, where a number of items are wanted, and the blocks take an
+ *    arbitrary amount of space, which needs to be calculated and never overrun
+ *    the bounds.
+ *
+ *    The buffer takes a data range (address + size) which is to be written to,
+ *    and allows writing to the range. It will never exceed the bounds given,
+ *    but 'offset' will be incremented to the point at which it would have been
+ *    if the buffer had been large enough. Each object should be marked as
+ *    complate with the 'complete' function. This updates the 'nwritten' and the
+ *    'good offset' to be the number of objects written, and the extent within
+ *    the buffer of the data.
+ *
+ *    Usage:
+ *
+ *        bufferdata_t buf;
+ *
+ *        bufferdata_init(user_buffer, user_buffer_len);
+ *
+ *        bufferdata_write_word(buf, ...);
+ *        ...
+ *        bufferdata_complete(buf);
+ *
+ *        if (bufferdata_failed(buf))
+ *        {
+ *            // Ran out of space, so report the size required
+ *            regs->r[2] = -bufferdata_required(buf);
+ *        }
+ *        else
+ *        {
+ *            // Report the size remaining
+ *            regs->r[2] = bufferdata_remaining(buf);
+ *            // or the size used:
+ *            // regs->r[2] = bufferdata_required(buf);
+ *        }
+ *
+ * Author:      Gerph
+ * Date:        21 Jul 2025
+ ******************************************************************/
+
+#ifndef BUFFERDATA_H
+#define BUFFERDATA_H
+
+#include <stdint.h>
+#include <stdbool.h>
+
+typedef struct bufferdata_s {
+    uint32_t nwritten;      /* Number of items written (number of 'complete' calls made */
+    uint32_t goodoffset;    /* Max offset of an item that was completely written */
+    uint32_t maxoffset;     /* Max offset we have attempted to operate on */
+    uint32_t offset;        /* Current offset we are working with */
+    uint8_t *data;          /* Pointer to our data (user's buffer) */
+    uint32_t limit;         /* Maximum size of the data (user's buffer length) */
+    bool     failed;        /* Whether we have failed (exceeded the limit) */
+} bufferdata_t;
+
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_init
+ Description:   Initialise the bufferdata structure for writing data
+ Parameters:    buf-> the buffer we're operating on
+                data-> the buffer we'll write to
+                datalen = the length of the data
+ Returns:       none
+ ******************************************************************/
+void bufferdata_init(bufferdata_t *buf, uint8_t *data, uint32_t datalen);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_address
+ Description:   Convert an offset in the buffer to an address in memory
+ Parameters:    buf-> the buffer we're operating on
+                offset = offset from our current location
+                relative = true if this is relative to current output, or false for an absolute address
+ Returns:       address of the byte this references
+ ******************************************************************/
+uint8_t *bufferdata_address(bufferdata_t *buf, int32_t offset, bool relative);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_failed
+ Description:   Return whether we failed to write all the records
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       true if we failed; false if we were successful in all writes
+ ******************************************************************/
+bool bufferdata_failed(bufferdata_t *buf);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_records
+ Description:   Return the number of records successfully written
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       number of records written
+ ******************************************************************/
+uint32_t bufferdata_records(bufferdata_t *buf);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_recordsend
+ Description:   Return the offset of the end of the successful records
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       offset of the last good record
+ ******************************************************************/
+uint32_t bufferdata_recordsend(bufferdata_t *buf);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_remaining
+ Description:   Amount of space required for the buffer we are operating on
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       free space left in the buffer
+ ******************************************************************/
+uint32_t bufferdata_remaining(bufferdata_t *buf);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_required
+ Description:   Amount of space required for the buffer we are operating on
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       space that is required to function
+ ******************************************************************/
+uint32_t bufferdata_required(bufferdata_t *buf);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_seek
+ Description:   Seek to an offset within the buffer
+ Parameters:    buf-> the buffer we're operating on
+                offset = the offset to seek to
+                relative = true to seek relative to current position
+                           false to seek to absolute offset
+ Returns:       the old offset we were at
+ ******************************************************************/
+uint32_t bufferdata_seek(bufferdata_t *buf, int32_t offset, bool relative);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_tell
+ Description:   Read the current position in the buffer
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       none
+ ******************************************************************/
+uint32_t bufferdata_tell(bufferdata_t *buf);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_byte
+ Description:   Write a byte to the current offset, and move ahead 1 byte
+ Parameters:    buf-> the buffer we're operating on
+                value = the value we are writing
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_byte(bufferdata_t *buf, uint8_t value);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_word
+ Description:   Write a word to the current offset, and move ahead 4 bytes
+ Parameters:    buf-> the buffer we're operating on
+                value = the value we are writing
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_word(bufferdata_t *buf, uint32_t value);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_string0aligned
+ Description:   Write a string to the current offset, and move ahead by its length, then align
+ Parameters:    buf-> the buffer we're operating on
+                value = the value we are writing
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_string0aligned(bufferdata_t *buf, const char *value);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_string0
+ Description:   Write a string to the current offset, and move ahead by its length
+ Parameters:    buf-> the buffer we're operating on
+                value = the value we are writing
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_string0(bufferdata_t *buf, const char *value);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_stringcr
+ Description:   Write a string to the current offset, and move ahead by its length, terminating with CR
+ Parameters:    buf-> the buffer we're operating on
+                value = the value we are writing
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_stringcr(bufferdata_t *buf, const char *value);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_stringpadded
+ Description:   Write a string to the current offset, and move ahead by its length, passing to maxlen with 0s
+ Parameters:    buf-> the buffer we're operating on
+                value = the value we are writing
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_stringpadded(bufferdata_t *buf, const char *value, uint32_t maxlen);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_bytes
+ Description:   Write a block of memory to the current offset, and move ahead by its length
+ Parameters:    buf-> the buffer we're operating on
+                data-> the bytes that we're writing
+                datalen = their length
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_bytes(bufferdata_t *buf, const void *data, uint32_t datalen);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_bytesaligned
+ Description:   Write a block of memory to the current offset, and move ahead by its length, then align
+ Parameters:    buf-> the buffer we're operating on
+                data-> the bytes that we're writing
+                datalen = their length
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_bytesaligned(bufferdata_t *buf, const void *data, uint32_t datalen);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_write_bytespadded
+ Description:   Write a block of memory to the current offset with 0-padding, and move ahead by its padding
+ Parameters:    buf-> the buffer we're operating on
+                data-> the bytes that we're writing
+                datalen = their length
+ Returns:       the offset the value was written to
+ ******************************************************************/
+uint32_t bufferdata_write_bytespadded(bufferdata_t *buf, const void *data, uint32_t datalen, uint32_t paddinglen);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_update_byte
+ Description:   Update a byte in already written data
+ Parameters:    buf-> the buffer we're operating on
+                offset = the offset to update
+                value = the value to write
+ Returns:       none
+ ******************************************************************/
+void bufferdata_update_byte(bufferdata_t *buf, uint32_t offset, uint8_t value);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_update_byte
+ Description:   Update a word in already written data
+ Parameters:    buf-> the buffer we're operating on
+                offset = the offset to update
+                value = the value to write
+ Returns:       none
+ ******************************************************************/
+void bufferdata_update_word(bufferdata_t *buf, uint32_t offset, uint32_t value);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_pad_align
+ Description:   Pad the buffer with 0 until aligned
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       offset we were at before aligning
+ ******************************************************************/
+uint32_t bufferdata_pad_align(bufferdata_t *buf);
+
+/*************************************************** Gerph *********
+ Function:      bufferdata_complete
+ Description:   Report that a record has been written completely
+ Parameters:    buf-> the buffer we're operating on
+ Returns:       none
+ ******************************************************************/
+void bufferdata_complete(bufferdata_t *buf);
+
+#endif

@@ -1,0 +1,25 @@
+/*******************************************************************
+ * File:     wildcard
+ * Purpose:  Wildcard matching for Wimp templates
+ * Author:   Gerph
+ * Date:     23 Nov 2025
+ ******************************************************************/
+
+#ifndef WILDCARD_H
+#define WILDCARD_H
+
+#include "ctrlstring.h"
+
+/*************************************************** Gerph *********
+ Function:     wildmatch_wt
+ Description:  Check whether we match a wildcard (case insensitive,
+               for wimp templates)
+ Parameters:   wild-> the wildcard to match with, terminated by
+                      control characters
+               str-> the string to match, terminated by control
+                     chars
+ Returns:      1 if matched, 0 if no match
+ ******************************************************************/
+int wildmatch_wt(ctrlstring_t wild, ctrlstring_t str);
+
+#endif

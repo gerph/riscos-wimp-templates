@@ -6,11 +6,14 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "kernel.h"
 #include "modhead.h"
 
 #include "templates.h"
+#include "bufferdata.h"
+#include "types.h"
 
 
 /***************************************************************************
@@ -86,7 +89,7 @@ _kernel_oserror *SWI_OpenTemplate(int number, _kernel_swi_regs *regs, void *pw)
     ot = templates_open(file_name);
     if (ot == NULL)
     {
-        /* FIXME: Return an error */
+        return err_WimpNoTemplateFile;
     }
 
     /* R0 corrupted */
@@ -158,23 +161,70 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
      *     R6 = context_out
      */
 
-//    /* Input registers */
-//    Wimp_Window * window = (Wimp_Window *)regs->r[1];
-//    char * data = (char *)regs->r[2];
-//    uint8_t *end = (uint8_t *)regs->r[3];
-//    uint8_t * font_ref = (uint8_t *)regs->r[4];
-//    char * name = (char *)regs->r[5];
-//    int32_t context = (int32_t)regs->r[6];
-//    /* Output registers */
-//    int32_t used;
-//    int32_t data_used;
-//    int32_t context_out;
-//
-//    /* FIXME: SWI not yet implemented */
-//
-//    /* R0 corrupted */
-//    regs->r[1] = (int)used;  // .Int
-//    regs->r[2] = (int)data_used;  // .Int
-//    regs->r[6] = (int)context_out;  // .Int
+#define LARGE_WINDOW_BUFFER (0xFFFFFF) /* A large value, as no end is specified in the API */
+
+    /* Input registers */
+    Wimp_Window * window = (Wimp_Window *)regs->r[1];
+    uint8_t *data = (uint8_t *)regs->r[2];
+    uint8_t *end = (uint8_t *)regs->r[3];
+    uint8_t *font_ref = (uint8_t *)regs->r[4];
+    char * template_name = (char *)regs->r[5];
+    int32_t context = (int32_t)regs->r[6];
+
+    /* Locals */
+    templateerror_t terr;
+    int template_num = 0;
+    bufferdata_t bufwin;
+    bufferdata_t bufind;
+
+#define READ_SIZE ((void*)(0xFFFFFFFFul))
+#define NO_FONTS  ((void*)(0xFFFFFFFFul))
+
+    if (window == READ_SIZE)
+        window = NULL;
+    if (data == READ_SIZE || (end - data) == 0)
+        data = NULL;
+    if (font_ref == NO_FONTS)
+        font_ref = NULL;
+
+    bufferdata_init(&bufwin, (uint8_t*)window, window == NULL ? 0 : LARGE_WINDOW_BUFFER);
+    bufferdata_init(&bufind, data, data == NULL ? 0 : end - data);
+
+    dprintf("Finding template '%s'\n", template_name);
+    template_num = templates_findidentifier(ot, template_name);
+    if (template_num == -1)
+    {
+        return err_WimpNoTemplate;
+    }
+    dprintf("  Template number %i\n", template_num);
+
+    terr = templates_readtemplate(ot, template_num, &bufwin, &bufind);
+    if (terr)
+        printf("Error reading template #%i: %i\n", template_num, terr);
+
+    if (window == NULL)
+    {
+        regs->r[1] = bufferdata_required(&bufwin);
+        regs->r[2] = bufferdata_required(&bufind);
+    }
+    else
+    {
+        regs->r[2] = (int)(data + bufferdata_required(&bufind));
+    }
+
+    {
+        const char *actual_name = templates_indextoname(ot, template_num);
+        strcpy(template_name, actual_name);
+    }
+
+    dprintf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
+    dprintf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
+    dprintf("window buffer: %p\n", window);
+    dprintf("indirect buffering state: %s\n", bufferdata_failed(&bufind) ? "FAIL" : "ok");
+    dprintf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
+    dprintf("indirect buffer: %p\n", data);
+
+    regs->r[6] = template_num;
+
     return err;
 }

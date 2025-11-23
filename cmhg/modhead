@@ -4,6 +4,8 @@
 
 #include "VersionNum"
 
+#include "riscos/NewErrors.h"
+
 ; If you declare module-is-runnable the module will be entered at the main()
 ; function in user mode (ie like a normal C program).
 ; You will probably never need this field.
@@ -58,7 +60,10 @@ swi-chunk-base-number: &C0000
 ; so manually in your C code, and is less likely to pollute error number
 ; space. The number is optional, and if omitted will be allocated from the
 ; error chunk.
-;error-identifiers: err_Silly(&1234,"Silly")
+error-identifiers: err_WimpNoTemplateFile(ErrorNumber_WimpNoTemplateFile, "NoTemplateFile:Template file not found"),
+                   err_WimpBadTemplate(ErrorNumber_WimpBadTemplate, "BadTemplate:Template entry invalid"),
+                   err_WimpNoTemplate(ErrorNumber_WimpNoTemplate, "NoTemplate:Template entry not found"),
+                   err_WimpTemplateEOF(ErrorNumber_TemplateEOF, "TemplateEOF:Template file truncated (end of file whilst reading template file)")
 
 ; When the module is initialised, this routine will be entered. You should
 ; be very careful to initialise your module safely. If anything fails, you
