@@ -232,10 +232,12 @@ int templates_close(opentemplate_t *ot)
  Function:      templates_findidentifier
  Description:   Find a template block by its string identifier
  Parameters:    ot-> the template file we are operating on
-                ctrl-> identifier we are finding (ctrl-terminated)
+                ctrl-> wildcarded identifier we are finding (ctrl-terminated)
+                start = index to start at (0 to start enumeration)
  Returns:       index to the template to use, or -1 if invalid
  ******************************************************************/
-int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl)
+int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl,
+                             int start)
 {
     int i;
     /* NOTE: In s/Wimp06 `matchnames` the comparison appears to be
@@ -244,7 +246,12 @@ int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl)
      *       to ignore the case (and some non-alphbetic characters).
      *       For example '[' and '{' will be identical.
      */
-    for (i=0; i<ot->nentries; i++)
+    if (start < 0)
+        start = 0;
+    if (start >= ot->nentries)
+        return -1;
+
+    for (i=start; i<ot->nentries; i++)
     {
         templateindexentry_t *ientry = &ot->entries[i];
 #ifdef SUPPORT_WILDCARDS

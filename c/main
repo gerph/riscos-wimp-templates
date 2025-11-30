@@ -22,18 +22,102 @@
 #endif
 
 
+void load_template(opentemplate_t *ot, int argc, char *argv[])
+{
+    templateerror_t terr;
+    uint8_t window[1024 * 4];
+    uint8_t indirect[1024 * 4];
+    char *template_name = NULL;
+    int template_num = 0;
+    bufferdata_t bufwin;
+    bufferdata_t bufind;
+
+    if (argc > 3)
+    {
+        template_name = argv[3];
+    }
+
+    bufferdata_init(&bufwin, &window[0], sizeof(window));
+    bufferdata_init(&bufind, &indirect[0], sizeof(indirect));
+
+    if (template_name != NULL)
+    {
+        printf("Finding template '%s'\n", template_name);
+        template_num = templates_findidentifier(ot, template_name, 0);
+        if (template_num == -1)
+        {
+            printf("Error finding identifier '%s'\n", template_name);
+            exit(1);
+        }
+        printf("  Template number %i\n", template_num);
+    }
+
+    terr = templates_readtemplate(ot, template_num, &bufwin, &bufind);
+    if (terr)
+        printf("Error reading template #%i: %i\n", template_num, terr);
+    printf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
+    printf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
+    printf("window buffer: %p\n", window);
+    printf("indirect buffering state: %s\n", bufferdata_failed(&bufind) ? "FAIL" : "ok");
+    printf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
+    printf("indirect buffer: %p\n", indirect);
+}
+
+
+void enum_templates(opentemplate_t *ot, int argc, char *argv[])
+{
+    char template_name[13];
+    int template_num = 0;
+    char *wildcard_name = NULL;
+
+    if (argc > 3)
+    {
+        wildcard_name = argv[3];
+    }
+    else
+    {
+        wildcard_name = "*";
+    }
+
+    while (1)
+    {
+        const char *name;
+        strcpy(template_name, wildcard_name);
+        printf("Finding template '%s'\n", template_name);
+
+        template_num = templates_findidentifier(ot, template_name, template_num);
+        if (template_num == -1)
+        {
+            printf("End of list\n");
+            exit(0);
+        }
+
+        printf("  Template number %i\n", template_num);
+        name = templates_indextoname(ot, template_num);
+        printf("    Name: %s\n", name);
+        template_num += 1;
+    }
+}
+
+void syntax(void)
+{
+    printf("Syntax: WimpTemplates load <filename> [<template-name>]\n");
+    printf("        WimpTemplates enum <filename>\n");
+    exit(1);
+}
+
 int main(int argc, char *argv[])
 {
     opentemplate_t *ot;
     const char *filename;
+    const char *command;
     printf("WimpTemplates " Module_FullVersionAndDate "\n");
-    if (argc < 2)
+    if (argc < 3)
     {
-        printf("Syntax: WimpTemplates <filename> [<template-name>]\n");
-        exit(1);
+        syntax();
     }
-
-    filename = argv[1];
+    command = argv[1];
+    filename = argv[2];
 
     ot = templates_open(filename);
     if (!ot)
@@ -41,44 +125,17 @@ int main(int argc, char *argv[])
         printf("Failed to open file\n");
     }
 
+    if (strcmp(command, "load") == 0)
     {
-        templateerror_t terr;
-        uint8_t window[1024 * 4];
-        uint8_t indirect[1024 * 4];
-        char *template_name = NULL;
-        int template_num = 0;
-        bufferdata_t bufwin;
-        bufferdata_t bufind;
-
-        if (argc > 2)
-        {
-            template_name = argv[2];
-        }
-
-        bufferdata_init(&bufwin, &window[0], sizeof(window));
-        bufferdata_init(&bufind, &indirect[0], sizeof(indirect));
-
-        if (template_name != NULL)
-        {
-            printf("Finding template '%s'\n", template_name);
-            template_num = templates_findidentifier(ot, template_name);
-            if (template_num == -1)
-            {
-                printf("Error finding identifier '%s'\n", template_name);
-                exit(1);
-            }
-            printf("  Template number %i\n", template_num);
-        }
-
-        terr = templates_readtemplate(ot, template_num, &bufwin, &bufind);
-        if (terr)
-            printf("Error reading template #%i: %i\n", template_num, terr);
-        printf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
-        printf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
-        printf("window buffer: %p\n", window);
-        printf("indirect buffering state: %s\n", bufferdata_failed(&bufind) ? "FAIL" : "ok");
-        printf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
-        printf("indirect buffer: %p\n", indirect);
+        load_template(ot, argc, argv);
+    }
+    else if (strcmp(command, "enum") == 0)
+    {
+        enum_templates(ot, argc, argv);
+    }
+    else
+    {
+        syntax();
     }
 
     templates_close(ot);
