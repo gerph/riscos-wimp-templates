@@ -63,7 +63,8 @@ swi-chunk-base-number: &C0000
 error-identifiers: err_WimpNoTemplateFile(ErrorNumber_WimpNoTemplateFile, "NoTemplateFile:Template file not found"),
                    err_WimpBadTemplate(ErrorNumber_WimpBadTemplate, "BadTemplate:Template entry invalid"),
                    err_WimpNoTemplate(ErrorNumber_WimpNoTemplate, "NoTemplate:Template entry not found"),
-                   err_WimpTemplateEOF(ErrorNumber_TemplateEOF, "TemplateEOF:Template file truncated (end of file whilst reading template file)")
+                   err_WimpTemplateEOF(ErrorNumber_TemplateEOF, "TemplateEOF:Template file truncated (end of file whilst reading template file)"),
+                   err_WimpTooBig(ErrorNumber_WimpTooBig, "TooBig:Window definition cannot fit indirected icons into template buffer")
 
 ; When the module is initialised, this routine will be entered. You should
 ; be very careful to initialise your module safely. If anything fails, you

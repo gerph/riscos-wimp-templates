@@ -1,8 +1,6 @@
 REM> Test-enum-template
 REM Test that the dummy module template enumeration works.
 
-DIM win% 4096
-DIM ind% 4096
 DIM tempname% 12
 
 file$="testdata.templates.palette"

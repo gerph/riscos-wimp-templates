@@ -1,8 +1,11 @@
 REM> Test-load-template
 REM Test that the dummy module template loading works.
 
-DIM win% 4096
-DIM ind% 4096
+winsize%=4096
+indsize%=4096
+REMindsize%=&34
+DIM win% winsize%
+DIM ind% indsize%
 DIM tempname% 12
 
 template$="BlackBG"
@@ -10,25 +13,28 @@ file$="testdata.templates.palette"
 REM file$="Templates"
 SYS "WimpTemplates_OpenTemplate",, file$
 
+createwin%=TRUE
 continue%=TRUE
 next%=0
 WHILE continue%
     $(tempname%) = template$
-    SYS "WimpTemplates_LoadTemplate",, win%, ind%,ind%+4096, -1, tempname%, next% TO ,reqwin%, indend%,r3,r4,name$, next%
+    SYS "WimpTemplates_LoadTemplate",, win%, ind%,ind%+indsize%, -1, tempname%, next% TO ,reqwin%, indend%,r3,r4,name$, next%
     IF next% <> 0 THEN
 
         PRINT "Name: ";name$
         PRINT "  Required space: &";~reqwin%
-        PRINT "  Indirect end: &";~indend%
+        PRINT "  Indirect end: &";~indend%;"  Limit: &";~(ind%+indsize%)
         PRINT "  Next: ";next%
 
-        PRINT "Create window"
-        SYS "Wimp_CreateWindow",,win% TO winh%
-        PRINT "Got handle ";~winh%
-        !win%=winh%:SYS "Wimp_GetWindowState",,win%
-        !win%=winh%:SYS "Wimp_OpenWindow",,win%
-        VDU4
-        PRINT "Opened"
+        IF createwin% THEN
+            PRINT "Create window"
+            SYS "Wimp_CreateWindow",,win% TO winh%
+            PRINT "Got handle ";~winh%
+            !win%=winh%:SYS "Wimp_GetWindowState",,win%
+            !win%=winh%:SYS "Wimp_OpenWindow",,win%
+            VDU4
+            PRINT "Opened"
+        ENDIF
 
         IF INSTR(template$, "*") = 0 AND INSTR(template$, "?") = 0 THEN
             continue%=FALSE
