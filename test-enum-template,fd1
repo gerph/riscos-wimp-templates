@@ -1,0 +1,26 @@
+REM> Test-enum-template
+REM Test that the dummy module template enumeration works.
+
+DIM win% 4096
+DIM ind% 4096
+DIM tempname% 12
+
+file$="testdata.templates.palette"
+REM file$="Templates"
+SYS "WimpTemplates_OpenTemplate",, file$
+
+continue%=TRUE
+next%=0
+WHILE continue%
+    $(tempname%) = "*"
+    SYS "WimpTemplates_LoadTemplate",, -1, -1, 0, -1, tempname%, next% TO ,reqwin%, indend%,r3,r4,name$, next%
+    IF next% <> 0 THEN
+        PRINT "Required space: &";~reqwin%
+        PRINT "Indirect end: &";~indend%
+        PRINT "Name: ";name$
+        PRINT "Next: ";next%
+    ELSE
+        continue% = FALSE
+    ENDIF
+
+ENDWHILE

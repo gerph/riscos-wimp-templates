@@ -28,11 +28,15 @@ jobs:
 
       - echo
       - echo Test that it runs
-      - aif32.wimptemplates testdata.templates.info
+      - aif32.wimptemplates load testdata.templates.info
 
       - echo
       - echo Test that we can read a wildcard name
-      - aif32.wimptemplates testdata.templates.palette R*
+      - aif32.wimptemplates load testdata.templates.palette R*
+
+      - echo
+      - echo Test that we can enumerate the templates
+      - aif32.wimptemplates enum testdata.templates.palette
 
       - echo Build the dummy module...
       - amu -f MakefileModule
@@ -42,6 +46,9 @@ jobs:
 
       - echo Test that we can load a template with SWIs
       - /test-load-template
+
+      - echo Test that we can enumerate a template with SWIs
+      - /test-enum-template
 
       - echo Copy artifacts
       - cdir Artifacts

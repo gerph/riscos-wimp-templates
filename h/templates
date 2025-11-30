@@ -13,14 +13,6 @@
 #include "ctrlstring.h"
 #include "bufferdata.h"
 
-#define DEBUG
-
-#ifdef DEBUG
-#define dprintf if (1) printf
-#else
-#define dprintf if (0) printf
-#endif
-
 typedef uint32_t fileoffset_t;
 
 #define TEMPLATE_DATA_TYPE_WINDOW (1)

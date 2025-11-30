@@ -19,7 +19,7 @@
 /* Whether wildcards are supported by identifier lookups */
 #define SUPPORT_WILDCARDS
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define dprintf if (1) printf
@@ -467,7 +467,7 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
                                        bufferdata_t *bufwin,
                                        bufferdata_t *bufind)
 {
-    int size = ot->entries[index].data_size;
+    // int size = ot->entries[index].data_size; // NOTE: We do not validate the content
     int offset = ot->entries[index].data_offset;
     Wimp_Window win;
     int read;

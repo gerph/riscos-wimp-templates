@@ -127,7 +127,7 @@ bool ctrlwildcarded(ctrlstring_t ctrl)
 {
     for (;*ctrl >= ' ';ctrl++)
     {
-        if (*ctrl == '?' || *ctrl == '*')
+        if (*ctrl == '#' || *ctrl == '*')
             return true;
     }
     return false;

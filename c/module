@@ -15,6 +15,14 @@
 #include "bufferdata.h"
 #include "types.h"
 
+//#define DEBUG
+
+#ifdef DEBUG
+#define dprintf if (1) printf
+#else
+#define dprintf if (0) printf
+#endif
+
 
 /***************************************************************************
  * Function:     Mod_Init
@@ -191,12 +199,31 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     bufferdata_init(&bufind, data, data == NULL ? 0 : end - data);
 
     dprintf("Finding template '%s'\n", template_name);
-    template_num = templates_findidentifier(ot, template_name);
+    template_num = templates_findidentifier(ot, template_name, context);
     if (template_num == -1)
     {
+        if (ctrlwildcarded(template_name))
+        {
+            /* They wanted to enumerate, but we're at the end */
+            regs->r[1] = 0;
+            regs->r[2] = 0;
+            regs->r[6] = 0;
+            return NULL;
+        }
         return err_WimpNoTemplate;
     }
     dprintf("  Template number %i\n", template_num);
+
+    if (ctrlwildcarded(template_name))
+    {
+        // They wildcarded the template name, so we need to replace the name they supplied.
+        // This ONLY happens when the string is wildcarded. The documentation isn't clear, but implies this.
+        // The original code explicitly only copies if wildcarded.
+        // Note: We're not worrying about word alignment; Classic RISC OS Wimp MUST have it word aligned.
+        const char *name = templates_indextoname(ot, template_num);
+        dprintf("  Wildcard resolved to '%s'\n", name);
+        strncpy(template_name, name, 12);
+    }
 
     terr = templates_readtemplate(ot, template_num, &bufwin, &bufind);
     if (terr)
@@ -212,11 +239,6 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
         regs->r[2] = (int)(data + bufferdata_required(&bufind));
     }
 
-    {
-        const char *actual_name = templates_indextoname(ot, template_num);
-        strcpy(template_name, actual_name);
-    }
-
     dprintf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
     dprintf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
     dprintf("window buffer: %p\n", window);
@@ -224,7 +246,7 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     dprintf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
     dprintf("indirect buffer: %p\n", data);
 
-    regs->r[6] = template_num;
+    regs->r[6] = template_num + 1;
 
     return err;
 }
