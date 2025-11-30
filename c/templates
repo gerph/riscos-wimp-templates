@@ -54,7 +54,10 @@ uint32_t templates_read_word(opentemplate_t *ot)
  ******************************************************************/
 uint32_t templates_read(opentemplate_t *ot, void *dest, int size)
 {
-    int read = fread(dest, 1, size, ot->fh);
+    int read;
+    if (size == 0)
+        return 0;
+    read = fread(dest, 1, size, ot->fh);
     return read;
 }
 
@@ -467,57 +470,82 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
                                        bufferdata_t *bufwin,
                                        bufferdata_t *bufind)
 {
-    // int size = ot->entries[index].data_size; // NOTE: We do not validate the content
+    int size = ot->entries[index].data_size; // NOTE: We do not validate the content
     int offset = ot->entries[index].data_offset;
+    int datatype = ot->entries[index].data_type;
     Wimp_Window win;
     int read;
     int iconnum;
     loadtemplatedata_t ltd;
     templates_seek(ot, offset, SEEK_SET);
 
-    read = templates_read(ot, &win, Wimp_WindowHeaderSize);
-    if (read != Wimp_WindowHeaderSize)
-        return TE_EOF;
-
-    bufferdata_write_bytes(bufwin, &win.visible, sizeof(win.visible));
-    bufferdata_write_bytes(bufwin, &win.xscroll, sizeof(win.xscroll) + sizeof(win.yscroll));
-    bufferdata_write_word(bufwin, 0xFFFFFFFF); /* Always force window to top */
-    bufferdata_write_word(bufwin, win.flags);
-    bufferdata_write_bytes(bufwin, &win.title_fg, sizeof(win.title_fg) * 7 + sizeof(win.extra_flags)); /* The colours */
-    bufferdata_write_bytes(bufwin, &win.extent, sizeof(win.extent));
-    bufferdata_write_bytes(bufwin, &win.title_flags, sizeof(win.title_flags) * 2); /* Title + work area flags */
-    bufferdata_write_word(bufwin, 1); /* FIXME: Should I be forcing sprite area to be the Wimp sprite pool? */
-    bufferdata_write_bytes(bufwin, &win.xmin, sizeof(win.xmin) * 2);
-
-    ltd.ot = ot;
-    ltd.bufwin = bufwin;
-    ltd.bufind = bufind;
-    ltd.base_offset = offset;
-    dprintf("Writing window data from template offset &%x, %i icons\n", offset, win.icon_count);
-    //dprintf("window base offset = &%x\n",ltd.base_offset);
-    /* FIXME: The font data will need passing in too */
-
-    /* Fixup title data */
-    dprintf("Process title icon data\n");
-    templates_writeicondata(&ltd, win.title_flags, &win.title_data);
-
-    bufferdata_write_word(bufwin, win.icon_count);
-    offset = Wimp_WindowHeaderSize;
-    for (iconnum=0; iconnum < win.icon_count; iconnum++)
+    if (datatype == 1)
     {
-        Wimp_Icon *icon = &win.icons[0];
-        dprintf("Load icon #%i at offset &%x\n", iconnum, offset);
-        templates_seek(ot, ltd.base_offset + offset, SEEK_SET);
-        read = templates_read(ot, icon, sizeof(Wimp_Icon));
-        if (read != sizeof(Wimp_Icon))
+        /* Wimp template */
+        read = templates_read(ot, &win, Wimp_WindowHeaderSize);
+        if (read != Wimp_WindowHeaderSize)
             return TE_EOF;
-        offset += read;
 
-        bufferdata_write_bytes(bufwin, &icon->extent, sizeof(icon->extent));
-        bufferdata_write_word(bufwin, icon->flags);
+        bufferdata_write_bytes(bufwin, &win.visible, sizeof(win.visible));
+        bufferdata_write_bytes(bufwin, &win.xscroll, sizeof(win.xscroll) + sizeof(win.yscroll));
+        bufferdata_write_word(bufwin, 0xFFFFFFFF); /* Always force window to top */
+        bufferdata_write_word(bufwin, win.flags);
+        bufferdata_write_bytes(bufwin, &win.title_fg, sizeof(win.title_fg) * 7 + sizeof(win.extra_flags)); /* The colours */
+        bufferdata_write_bytes(bufwin, &win.extent, sizeof(win.extent));
+        bufferdata_write_bytes(bufwin, &win.title_flags, sizeof(win.title_flags) * 2); /* Title + work area flags */
+        bufferdata_write_word(bufwin, 1); /* FIXME: Should I be forcing sprite area to be the Wimp sprite pool? */
+        bufferdata_write_bytes(bufwin, &win.xmin, sizeof(win.xmin) * 2);
 
-        /* Handle the icon data */
-        templates_writeicondata(&ltd, icon->flags, &icon->data);
+        ltd.ot = ot;
+        ltd.bufwin = bufwin;
+        ltd.bufind = bufind;
+        ltd.base_offset = offset;
+        dprintf("Writing window data from template offset &%x, %i icons\n", offset, win.icon_count);
+        //dprintf("window base offset = &%x\n",ltd.base_offset);
+        /* FIXME: The font data will need passing in too */
+
+        /* Fixup title data */
+        dprintf("Process title icon data\n");
+        templates_writeicondata(&ltd, win.title_flags, &win.title_data);
+
+        bufferdata_write_word(bufwin, win.icon_count);
+        offset = Wimp_WindowHeaderSize;
+        for (iconnum=0; iconnum < win.icon_count; iconnum++)
+        {
+            Wimp_Icon *icon = &win.icons[0];
+            dprintf("Load icon #%i at offset &%x\n", iconnum, offset);
+            templates_seek(ot, ltd.base_offset + offset, SEEK_SET);
+            read = templates_read(ot, icon, sizeof(Wimp_Icon));
+            if (read != sizeof(Wimp_Icon))
+                return TE_EOF;
+            offset += read;
+
+            bufferdata_write_bytes(bufwin, &icon->extent, sizeof(icon->extent));
+            bufferdata_write_word(bufwin, icon->flags);
+
+            /* Handle the icon data */
+            templates_writeicondata(&ltd, icon->flags, &icon->data);
+        }
+    }
+    else
+    {
+        /* Not a wimp template */
+        /* If a non-template data object is requested, we only load the data into the buffer - no processing
+           is performed */
+        int remaining = bufferdata_remaining(bufwin);
+        int read;
+        if (remaining > size)
+            remaining = size;
+        templates_seek(ot, offset, SEEK_SET);
+        read = templates_read(ot, bufferdata_address(bufwin, 0, true), remaining);
+        if (read < remaining)
+            return TE_EOF;
+        /* We've read part of the data into the buffer memory; there may be more to come */
+        size -= read;
+        if (size > 0)
+        {
+            bufferdata_seek(bufwin, size, true);
+        }
     }
 
     return TE_OK;
