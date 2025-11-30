@@ -30,12 +30,25 @@ struct ctc_templateindexentry {
     char check[(sizeof(templateindexentry_t) == (3*4 + 12)) ? 1 : -1];
 };
 
+typedef struct templatefontentry_s {
+    uint32_t        xpointsize16;
+    uint32_t        ypointsize16;
+    char            fontname[40];
+} templatefontentry_t;
+
+/* compile time check that the structure is the right size */
+struct ctc_templatefontentry {
+    char check[(sizeof(templatefontentry_t) == (4+4+40)) ? 1 : -1];
+};
+
 struct opentemplate_s {
     struct opentemplate_s   *next;
     FILE                    *fh;
     fileoffset_t             font_data_offset;
     int                      nentries;
     templateindexentry_t    *entries;
+    int                      nfonts;
+    templatefontentry_t     *fonttable;
 };
 
 typedef struct opentemplate_s opentemplate_t;

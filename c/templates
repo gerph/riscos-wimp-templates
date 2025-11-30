@@ -19,7 +19,7 @@
 /* Whether wildcards are supported by identifier lookups */
 #define SUPPORT_WILDCARDS
 
-//#define DEBUG
+#define DEBUG
 
 #ifdef DEBUG
 #define dprintf if (1) printf
@@ -93,7 +93,7 @@ opentemplate_t *templates_open(const char *filename)
     opentemplate_t *ot;
     FILE *fh;
 
-    ot = malloc(sizeof(*ot));
+    ot = calloc(1, sizeof(*ot));
     if (ot == NULL)
         return NULL;
 
@@ -118,6 +118,7 @@ opentemplate_t *templates_open(const char *filename)
         templates_read_word(ot) != 0 ||
         templates_read_word(ot) != 0)
     {
+        dprintf("Initial words are not 0\n");
         goto failed;
     }
 
@@ -139,7 +140,10 @@ opentemplate_t *templates_open(const char *filename)
         size = sizeof(templateindexentry_t) * nentries;
         entries = malloc(size);
         if (entries == NULL)
+        {
+            dprintf("Could not allocated memory for %i entries\n", nentries);
             goto failed;
+        }
 
         templates_seek(ot, 16, SEEK_SET);
         ot->entries = entries;
@@ -169,6 +173,34 @@ opentemplate_t *templates_open(const char *filename)
             }
         }
 
+        /* Load the font table */
+        if (ot->font_data_offset == 0)
+        {
+            ot->nfonts = 0;
+            ot->fonttable = NULL;
+        }
+        else
+        {
+            long filesize;
+            long fonttablesize;
+            fseek(ot->fh, 0, SEEK_END);
+            filesize = ftell(ot->fh);
+            if (ot->font_data_offset >= filesize)
+            {
+                dprintf("Font data has an invalid file offset\n");
+                goto failed;
+            }
+            fonttablesize = filesize - ot->font_data_offset;
+            ot->fonttable = malloc((int)fonttablesize);
+            fseek(ot->fh, ot->font_data_offset, SEEK_SET);
+            if (templates_read(ot, ot->fonttable, (int)fonttablesize) != fonttablesize)
+            {
+                dprintf("Failed to read font table\n");
+                goto failed;
+            }
+            ot->nfonts = (int)fonttablesize / sizeof(templatefontentry_t);
+        }
+
 #ifdef DEBUG
         {
             int i;
@@ -194,6 +226,8 @@ opentemplate_t *templates_open(const char *filename)
 
 failed:
     fclose(ot->fh);
+    free(ot->entries);
+    free(ot->fonttable);
     free(ot);
     /* FIXME: Better way of reporting errors ? */
     return NULL;
@@ -219,6 +253,7 @@ int templates_close(opentemplate_t *ot)
             dprintf("Closing open template file\n");
             fclose(ot->fh);
             free(ot->entries);
+            free(ot->fonttable);
             free(ot);
             return 0;
         }
@@ -355,9 +390,8 @@ templateerror_t templates_stringindirect(loadtemplatedata_t *ltd,
 /*************************************************** Gerph *********
  Function:      templates_writeicondata
  Description:   Write an icondata into the user's buffer
- Parameters:    ot-> the template we are operating on
-                bufwin-> the buffer to write the window into
-                bufind-> the buffer to write indirected data into
+ Parameters:    ltd-> the collected data for template loading.
+                iconflags = the flags for the icon
                 icondata-> the icon's data
  Returns:       template error code
  ******************************************************************/
@@ -440,20 +474,29 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
     {
         dprintf("    Sprite name in icon: %.12s\n", icondata->sprite);
     }
-/*
-    if iconflags & (Wimp_IconText | Wimp_IconSprite) and \
-       iconflags & Wimp_IconIndirected:
-
-
-    elif iconflags & Wimp_IconText:
-        # For debugging
-        if self.debug_wimptemplate:
-            text = re.sub('[\x00-\x1f].*$', '', icondata, flags=re.DOTALL)
-            print("  Text: %r" % (text,))
-*/
 
     bufferdata_write_bytes(ltd->bufwin, icondata, sizeof(*icondata));
 
+    return TE_OK;
+}
+
+/*************************************************** Gerph *********
+ Function:      templates_fixupiconfont
+ Description:   Update the icon's font using the information from the template
+ Parameters:    ltd-> the data for loading the file
+                iconflags-> the flags for the icon to fix
+ Returns:       none
+ ******************************************************************/
+templateerror_t templates_fixupiconfont(loadtemplatedata_t *ltd,
+                                        Wimp_IconFlags *iconflags)
+{
+    Wimp_IconFlags flags = *iconflags;
+    dprintf("  Icon flags &%08x\n", flags);
+    if (flags & Wimp_IconAntiAliased)
+    {
+        /* This is antialiased, so we need to claim the font */
+        dprintf("  Is anti-aliased\n");
+    }
     return TE_OK;
 }
 
@@ -464,6 +507,7 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
                 index = the index of the template we're reading
                 bufwin-> the buffer to write the window into
                 bufind-> the buffer to write indirected data into
+                enum_only = true if we're only enumerating, not writing to memory
  Returns:       template error code
  ******************************************************************/
 templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
@@ -525,6 +569,21 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
 
             /* Handle the icon data */
             templates_writeicondata(&ltd, icon->flags, &icon->data);
+        }
+
+        if (! bufferdata_failed(bufwin) &&
+            ! bufferdata_failed(bufind))
+        {
+            /* We fitted all the data into the window blocks and indirect blocks */
+            /* Now we need to check for fonts in the windows */
+            templates_fixupiconfont(&ltd, &win.title_flags);
+            for (iconnum=0; iconnum < win.icon_count; iconnum++)
+            {
+                Wimp_Window *win = (Wimp_Window *)bufferdata_address(bufwin, 0, false);
+                Wimp_Icon *icon = &win->icons[iconnum];
+                dprintf("Fix icon #%i font\n", iconnum);
+                templates_fixupiconfont(&ltd, &icon->flags);
+            }
         }
     }
     else
