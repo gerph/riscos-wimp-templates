@@ -270,15 +270,15 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
         regs->r[2] = (int)(data + bufferdata_required(&bufind));
     }
 
-    if (bufferdata_failed(&bufind))
-        return err_WimpTooBig;
-
     dprintf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
     dprintf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
     dprintf("window buffer: %p\n", window);
     dprintf("indirect buffering state: %s\n", bufferdata_failed(&bufind) ? "FAIL" : "ok");
     dprintf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
     dprintf("indirect buffer: %p\n", data);
+
+    if (bufferdata_failed(&bufind) && !enum_only)
+        return err_WimpTooBig;
 
     regs->r[6] = template_num + 1;
 
