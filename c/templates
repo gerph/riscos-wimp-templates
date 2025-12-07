@@ -643,8 +643,6 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
         ltd.fontclaim = fontclaim;
         ltd.base_offset = offset;
         dprintf("Writing window data from template offset &%x, %i icons\n", offset, win.icon_count);
-        //dprintf("window base offset = &%x\n",ltd.base_offset);
-        /* FIXME: The font data will need passing in too */
 
         /* Fixup title data */
         dprintf("Process title icon data\n");
