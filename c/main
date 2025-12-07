@@ -21,6 +21,12 @@
 #define dprintf if (0) printf
 #endif
 
+int fake_fontclaim(const char *fontname, int xpointsize16, int ypointsize16)
+{
+    dprintf("Font claim of '%s', at size %i x %i\n", fontname, xpointsize16, ypointsize16);
+    return 1;
+}
+
 
 void load_template(opentemplate_t *ot, int argc, char *argv[])
 {
@@ -31,6 +37,7 @@ void load_template(opentemplate_t *ot, int argc, char *argv[])
     int template_num = 0;
     bufferdata_t bufwin;
     bufferdata_t bufind;
+    fontusagetable_t fontusage;
 
     if (argc > 3)
     {
@@ -39,6 +46,8 @@ void load_template(opentemplate_t *ot, int argc, char *argv[])
 
     bufferdata_init(&bufwin, &window[0], sizeof(window));
     bufferdata_init(&bufind, &indirect[0], sizeof(indirect));
+
+    memset(fontusage.used, 0, sizeof(fontusage));
 
     if (template_name != NULL)
     {
@@ -52,9 +61,20 @@ void load_template(opentemplate_t *ot, int argc, char *argv[])
         printf("  Template number %i\n", template_num);
     }
 
-    terr = templates_readtemplate(ot, template_num, &bufwin, &bufind);
+    terr = templates_readtemplate(ot, template_num, &bufwin, &bufind, &fontusage, false, fake_fontclaim);
     if (terr)
+    {
         printf("Error reading template #%i: %i\n", template_num, terr);
+        switch (terr)
+        {
+            case TE_OK:             printf("  TE_OK\n"); break;
+            case TE_EOF:            printf("  TE_EOF\n"); break;
+            case TE_FONTBADINDEX:   printf("  TE_FONTBADINDEX\n"); break;
+            case TE_FONTMISSING:    printf("  TE_FONTMISSING\n"); break;
+            case TE_FONTSNEEDED:    printf("  TE_FONTSNEEDED\n"); break;
+            default:                printf("  UNKNOWN\n"); break;
+        }
+    }
     printf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
     printf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
     printf("window buffer: %p\n", window);

@@ -55,8 +55,18 @@ typedef struct opentemplate_s opentemplate_t;
 
 typedef enum templateerror_e {
     TE_OK,
-    TE_EOF
+    TE_EOF,
+    TE_FONTBADINDEX, /* They used a font index which is not defined */
+    TE_FONTMISSING,  /* They used a font which does not exist */
+    TE_FONTSNEEDED   /* They did not supply a font usage table, but the template requires fonts */
 } templateerror_t;
+
+typedef struct fontusagetable_s {
+    char used[256];
+} fontusagetable_t;
+
+/* Callback function to claim fonts */
+typedef int (*fontclaim_f)(const char *name, int xpointsize16, int ypointsize16);
 
 
 /* Value to return when we reached the end of file */
@@ -108,10 +118,16 @@ const char *templates_indextoname(opentemplate_t *ot, int index);
                 index = the index of the template we're reading
                 bufwin-> the buffer to write the window into
                 bufind-> the buffer to write indirected data into
+                fontusage-> table of fonts used by this template
+                enum_only = true if we're only enumerating, not writing to memory
+                fontclaim = function which claims a font and returns handle
  Returns:       template error code
  ******************************************************************/
 templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
                                        bufferdata_t *bufwin,
-                                       bufferdata_t *bufind);
+                                       bufferdata_t *bufind,
+                                       fontusagetable_t *fontusage,
+                                       bool enum_only,
+                                       fontclaim_f fontclaim);
 
 #endif

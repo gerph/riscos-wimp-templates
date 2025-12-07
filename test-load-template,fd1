@@ -7,18 +7,23 @@ REMindsize%=&34
 DIM win% winsize%
 DIM ind% indsize%
 DIM tempname% 12
+DIM fontusage% 256
 
 template$="BlackBG"
 file$="testdata.templates.palette"
 REM file$="Templates"
+REM file$="testdata.templates.fonttemplate":template$="desktop"
+
 SYS "WimpTemplates_OpenTemplate",, file$
+
+FOR I=0TO255:fontusage%?I=0:NEXT
 
 createwin%=TRUE
 continue%=TRUE
 next%=0
 WHILE continue%
     $(tempname%) = template$
-    SYS "WimpTemplates_LoadTemplate",, win%, ind%,ind%+indsize%, -1, tempname%, next% TO ,reqwin%, indend%,r3,r4,name$, next%
+    SYS "WimpTemplates_LoadTemplate",, win%, ind%,ind%+indsize%, fontusage%, tempname%, next% TO ,reqwin%, indend%,r3,r4,name$, next%
     IF next% <> 0 THEN
 
         PRINT "Name: ";name$

@@ -9,8 +9,9 @@
 #include <string.h>
 
 #include "kernel.h"
-#include "modhead.h"
+#include "swis.h"
 
+#include "modhead.h"
 #include "templates.h"
 #include "bufferdata.h"
 #include "types.h"
@@ -139,6 +140,29 @@ _kernel_oserror *SWI_CloseTemplate(int number, _kernel_swi_regs *regs, void *pw)
 }
 
 
+/*************************************************** Gerph *********
+ Function:      font_claim
+ Description:   Callback to claim a font for a window
+ Parameters:    fontname-> the name to claim
+                xpointsize16 = the font size in 24.4 format
+                ypointsize16 = the font size in 24.4 format
+ Returns:       -1 if failed, or handle from 1 - 255
+ ******************************************************************/
+int font_claim(const char *fontname, int xpointsize16, int ypointsize16)
+{
+    int fonthandle = 0;
+    _kernel_oserror *err;
+    dprintf("Font claim of '%s', at size %i x %i\n", fontname, xpointsize16, ypointsize16);
+    err = _swix(Font_FindFont, _INR(1, 5) | _OUT(0), fontname, xpointsize16, ypointsize16, 0, 0, &fonthandle);
+    if (err)
+        return -1;
+    if (fonthandle < 1 || fonthandle > 255)
+    {
+        /* FIXME: Should we LoseFont if they returned something out of spec? */
+        return -1;
+    }
+    return fonthandle;
+}
 
 
 /***************************************************************************
@@ -175,7 +199,7 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     Wimp_Window * window = (Wimp_Window *)regs->r[1];
     uint8_t *data = (uint8_t *)regs->r[2];
     uint8_t *end = (uint8_t *)regs->r[3];
-    uint8_t *font_ref = (uint8_t *)regs->r[4];
+    fontusagetable_t *font_ref = (fontusagetable_t *)regs->r[4];
     char * template_name = (char *)regs->r[5];
     int32_t context = (int32_t)regs->r[6];
 
@@ -184,15 +208,22 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     int template_num = 0;
     bufferdata_t bufwin;
     bufferdata_t bufind;
+    bool enum_only = false;
 
 #define READ_SIZE ((void*)(0xFFFFFFFFul))
 #define NO_FONTS  ((void*)(0xFFFFFFFFul))
 
     if (window == READ_SIZE)
+    {
         window = NULL;
+        enum_only = true;
+    }
     if (data == READ_SIZE || (end - data) == 0)
+    {
         data = NULL;
-    if (font_ref == NO_FONTS)
+        enum_only = true;
+    }
+    if (font_ref == NO_FONTS) /* -1 and 0 are 'no fonts' */
         font_ref = NULL;
 
     bufferdata_init(&bufwin, (uint8_t*)window, window == NULL ? 0 : LARGE_WINDOW_BUFFER);
@@ -225,7 +256,7 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
         strncpy(template_name, name, 12);
     }
 
-    terr = templates_readtemplate(ot, template_num, &bufwin, &bufind);
+    terr = templates_readtemplate(ot, template_num, &bufwin, &bufind, font_ref, enum_only, font_claim);
     if (terr)
         printf("Error reading template #%i: %i\n", template_num, terr);
 

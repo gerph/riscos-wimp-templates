@@ -183,6 +183,8 @@ opentemplate_t *templates_open(const char *filename)
         {
             long filesize;
             long fonttablesize;
+            int nfonts;
+            int i;
             fseek(ot->fh, 0, SEEK_END);
             filesize = ftell(ot->fh);
             if (ot->font_data_offset >= filesize)
@@ -191,14 +193,48 @@ opentemplate_t *templates_open(const char *filename)
                 goto failed;
             }
             fonttablesize = filesize - ot->font_data_offset;
+            nfonts = (int)fonttablesize / sizeof(templatefontentry_t);
+            if (fonttablesize % sizeof(templatefontentry_t) != 0)
+            {
+                dprintf("Font data has an invalid length (not a multiple of 48)\n");
+                goto failed;
+            }
             ot->fonttable = malloc((int)fonttablesize);
+            dprintf("Loading font data from &%x, of size %li; %i fonts\n", ot->font_data_offset, fonttablesize, nfonts);
             fseek(ot->fh, ot->font_data_offset, SEEK_SET);
             if (templates_read(ot, ot->fonttable, (int)fonttablesize) != fonttablesize)
             {
                 dprintf("Failed to read font table\n");
                 goto failed;
             }
-            ot->nfonts = (int)fonttablesize / sizeof(templatefontentry_t);
+            ot->nfonts = nfonts;
+
+            /* Ensure all the font names are terminated for easier handling. */
+            for (i = 0; i<nfonts; i++)
+            {
+                char *fontname = ot->fonttable[i].fontname;
+                int len = ctrlstrlen(fontname);
+                if (len > sizeof(ot->fonttable[i].fontname) - 1)
+                {
+                    dprintf("Font name for index %i is not valid (too long, %i bytes)\n", i, len);
+                    goto failed;
+                }
+                if (len == 0)
+                {
+                    dprintf("Font name for index %i is not valid (too short, %i bytes)\n", i, len);
+                    goto failed;
+                }
+                fontname[len] = '\0';
+                /* FIXME: We could check that the size of the font wasn't too large -
+                          anything over say 256 could be faulted */
+                if (ot->fonttable[i].xpointsize16 == 0 ||
+                    ot->fonttable[i].ypointsize16 == 0)
+                {
+                    dprintf("Font size for index %i is not valid (%i x %i)\n", i, ot->fonttable[i].xpointsize16,
+                                                                                  ot->fonttable[i].ypointsize16);
+                    goto failed;
+                }
+            }
         }
 
 #ifdef DEBUG
@@ -213,6 +249,14 @@ opentemplate_t *templates_open(const char *filename)
                         ot->entries[i].data_size,
                         ot->entries[i].data_type,
                         ot->entries[i].identifier);
+            }
+            dprintf("templates_open: Read font table...\n");
+            for (i = 0 ; i < ot->nfonts; i++)
+            {
+                templatefontentry_t *fe = &ot->fonttable[i];
+                dprintf("%3i : Font '%s', %i.%04i x %i.%04i\n", i, fe->fontname,
+                                                                fe->xpointsize16 / 16, 1000 * (fe->xpointsize16 % 16) / 16,
+                                                                fe->ypointsize16 / 16, 1000 * (fe->ypointsize16 % 16) / 16);
             }
         }
 #endif
@@ -321,8 +365,12 @@ const char *templates_indextoname(opentemplate_t *ot, int index)
 
 typedef struct loadtemplatedata_s {
     opentemplate_t *ot;
+
     bufferdata_t *bufwin;
     bufferdata_t *bufind;
+    fontusagetable_t *fontusage;
+    fontclaim_f fontclaim;
+
     int base_offset;
 } loadtemplatedata_t;
 
@@ -495,7 +543,45 @@ templateerror_t templates_fixupiconfont(loadtemplatedata_t *ltd,
     if (flags & Wimp_IconAntiAliased)
     {
         /* This is antialiased, so we need to claim the font */
-        dprintf("  Is anti-aliased\n");
+        int fontindex = (*iconflags & Wimp_IconFontHandle) >> Wimp_IconFontHandleShift;
+        int fonthandle;
+        templatefontentry_t *tfe;
+
+        dprintf("  Is anti-aliased (font index %i)\n", fontindex);
+
+        /* Clear the font index mask, to let us put the font handle in */
+        *iconflags = *iconflags & ~Wimp_IconFontHandle;
+
+        /* We need to...
+         *   0. Validate parameters.
+         *   1. Claim a font - and report errors if failed.
+         *   2. Increment the counter in the font usage table.
+         *   3. Write the font handle into the icon flags.
+         */
+
+        /* Validation */
+        if (ltd->fontusage == NULL)
+            return TE_FONTSNEEDED; /* They didn't supply a font usage table */
+        if (fontindex == 0 || fontindex > ltd->ot->nfonts)
+        {
+            /* The PRM implies that this is not valid (only 1-nfonts) */
+            return TE_FONTBADINDEX;
+        }
+
+        /* Claim font */
+        tfe = &ltd->ot->fonttable[fontindex - 1];
+        fonthandle = ltd->fontclaim(tfe->fontname, tfe->xpointsize16, tfe->ypointsize16);
+        dprintf("  Claim font gave: %i\n", fonthandle);
+        if (fonthandle < 0 || fonthandle > 255)
+        {
+            return TE_FONTMISSING;
+        }
+
+        /* Increment usage */
+        ltd->fontusage->used[fonthandle] += 1;
+
+        /* Update icon flags */
+        *iconflags = *iconflags | (fonthandle << Wimp_IconFontHandleShift);
     }
     return TE_OK;
 }
@@ -507,12 +593,17 @@ templateerror_t templates_fixupiconfont(loadtemplatedata_t *ltd,
                 index = the index of the template we're reading
                 bufwin-> the buffer to write the window into
                 bufind-> the buffer to write indirected data into
+                fontusage-> table of fonts used by this template
                 enum_only = true if we're only enumerating, not writing to memory
+                fontclaim = function which claims a font and returns handle
  Returns:       template error code
  ******************************************************************/
 templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
                                        bufferdata_t *bufwin,
-                                       bufferdata_t *bufind)
+                                       bufferdata_t *bufind,
+                                       fontusagetable_t *fontusage,
+                                       bool enum_only,
+                                       fontclaim_f fontclaim)
 {
     int size = ot->entries[index].data_size; // NOTE: We do not validate the content
     int offset = ot->entries[index].data_offset;
@@ -543,6 +634,8 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
         ltd.ot = ot;
         ltd.bufwin = bufwin;
         ltd.bufind = bufind;
+        ltd.fontusage = fontusage;
+        ltd.fontclaim = fontclaim;
         ltd.base_offset = offset;
         dprintf("Writing window data from template offset &%x, %i icons\n", offset, win.icon_count);
         //dprintf("window base offset = &%x\n",ltd.base_offset);
@@ -576,13 +669,28 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
         {
             /* We fitted all the data into the window blocks and indirect blocks */
             /* Now we need to check for fonts in the windows */
-            templates_fixupiconfont(&ltd, &win.title_flags);
-            for (iconnum=0; iconnum < win.icon_count; iconnum++)
+            if (!enum_only)
             {
-                Wimp_Window *win = (Wimp_Window *)bufferdata_address(bufwin, 0, false);
-                Wimp_Icon *icon = &win->icons[iconnum];
-                dprintf("Fix icon #%i font\n", iconnum);
-                templates_fixupiconfont(&ltd, &icon->flags);
+                /* Only apply fixup if we're not enumerating */
+                templateerror_t terr;
+                terr = templates_fixupiconfont(&ltd, &win.title_flags);
+                if (terr)
+                {
+                    dprintf("Fixup of the font for the title failed\n");
+                    return terr;
+                }
+                for (iconnum=0; iconnum < win.icon_count; iconnum++)
+                {
+                    Wimp_Window *win = (Wimp_Window *)bufferdata_address(bufwin, 0, false);
+                    Wimp_Icon *icon = &win->icons[iconnum];
+                    dprintf("Fix icon #%i font\n", iconnum);
+                    terr = templates_fixupiconfont(&ltd, &icon->flags);
+                    if (terr)
+                    {
+                        dprintf("Fixup of the font for icon %i failed\n", iconnum);
+                        return terr;
+                    }
+                }
             }
         }
     }
