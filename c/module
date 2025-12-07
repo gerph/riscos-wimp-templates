@@ -258,7 +258,18 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
 
     terr = templates_readtemplate(ot, template_num, &bufwin, &bufind, font_ref, enum_only, font_claim);
     if (terr)
+    {
         printf("Error reading template #%i: %i\n", template_num, terr);
+        switch (terr)
+        {
+            case TE_OK:             err = NULL; break;
+            case TE_EOF:            err = err_WimpTemplateEOF; break;
+            case TE_FONTBADINDEX:   err = err_WimpBadFontIndex; break;
+            case TE_FONTMISSING:    err = err_WimpFontNotFound; break;
+            case TE_FONTSNEEDED:    err = err_WimpBadFonts; break;
+            default:                err = err_WimpBadTemplate; break;
+        }
+    }
 
     if (window == NULL)
     {

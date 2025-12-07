@@ -19,7 +19,7 @@
 /* Whether wildcards are supported by identifier lookups */
 #define SUPPORT_WILDCARDS
 
-#define DEBUG
+//#define DEBUG
 
 #ifdef DEBUG
 #define dprintf if (1) printf
