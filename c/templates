@@ -176,6 +176,8 @@ opentemplate_t *templates_open(const char *filename)
         /* Load the font table */
         if (ot->font_data_offset == 0)
         {
+no_font_data:
+            ot->font_data_offset = 0;
             ot->nfonts = 0;
             ot->fonttable = NULL;
         }
@@ -187,7 +189,10 @@ opentemplate_t *templates_open(const char *filename)
             int i;
             fseek(ot->fh, 0, SEEK_END);
             filesize = ftell(ot->fh);
-            if (ot->font_data_offset >= filesize)
+            if (ot->font_data_offset == filesize)
+                goto no_font_data;
+
+            if (ot->font_data_offset > filesize)
             {
                 dprintf("Font data has an invalid file offset\n");
                 goto failed;
