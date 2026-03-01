@@ -9,6 +9,7 @@
 #define CSSTRING_H
 
 #include <stdbool.h>
+#include "global.h"
 
 typedef char *ctrlstring_t;       /* Control terminated string */
 

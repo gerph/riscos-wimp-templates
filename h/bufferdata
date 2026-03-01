@@ -52,6 +52,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "global.h"
 
 typedef struct bufferdata_s {
     uint32_t nwritten;      /* Number of items written (number of 'complete' calls made */

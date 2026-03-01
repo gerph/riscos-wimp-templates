@@ -9,6 +9,7 @@
 #define TYPES_H
 
 #include <stdint.h>
+#include "global.h"
 
 typedef uint32_t addr32_t; /* 32bit address pointer */
 

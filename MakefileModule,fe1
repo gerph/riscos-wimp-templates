@@ -40,6 +40,7 @@ OBJS       = o.wildcard \
              o.modhead \
              o.templates \
              o.ctrlstring \
+             o.swis_template \
              o.module
 
 # No fortify present (but we understand it)

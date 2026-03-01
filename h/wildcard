@@ -9,6 +9,7 @@
 #define WILDCARD_H
 
 #include "ctrlstring.h"
+#include "global.h"
 
 /*************************************************** Gerph *********
  Function:     wildmatch_wt

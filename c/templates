@@ -27,8 +27,12 @@
 #define dprintf if (0) printf
 #endif
 
-
+#ifdef IN_ASM_WIMP
+#define opentemplates (global->g_opentemplates)
+#else
 static opentemplate_t *opentemplates;
+#endif
+
 
 
 /*************************************************** Gerph *********
@@ -575,7 +579,11 @@ templateerror_t templates_fixupiconfont(loadtemplatedata_t *ltd,
 
         /* Claim font */
         tfe = &ltd->ot->fonttable[fontindex - 1];
+#ifdef IN_ASM_WIMP
+        fonthandle = font_claim(tfe->fontname, tfe->xpointsize16, tfe->ypointsize16);
+#else
         fonthandle = ltd->fontclaim(tfe->fontname, tfe->xpointsize16, tfe->ypointsize16);
+#endif
         dprintf("  Claim font gave: %i\n", fonthandle);
         if (fonthandle < 0 || fonthandle > 255)
         {

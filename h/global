@@ -1,0 +1,21 @@
+/*******************************************************************
+ * File:        global.h
+ * Purpose:     Global definitions, largely used for integration with assembler Wimp.
+ * Author:      Gerph
+ * Date:        01 Mar 2026
+ ******************************************************************/
+
+#ifndef GLOBAL_H
+#define GLOBAL_H
+
+#ifdef IN_ASM_WIMP
+typedef struct globalws_s {
+    void *modulews;
+    struct opentemplate_s *g_opentemplates;
+    struct opentemplate_s *g_currenttemplate;
+} globalws_t;
+
+globalws_t __global_reg(6) *global;
+#endif
+
+#endif

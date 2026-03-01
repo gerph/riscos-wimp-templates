@@ -9,7 +9,9 @@
 #include <string.h>
 #include <stdlib.h>
 
+#ifndef NO_FORTIFY
 #include "fortify.h"
+#endif
 
 #include "ctrlstring.h"
 
