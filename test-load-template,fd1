@@ -13,6 +13,8 @@ template$="BlackBG"
 file$="testdata.templates.palette"
 REM file$="Templates"
 REM file$="testdata.templates.fonttemplate":template$="desktop"
+REMfile$="WimpTemplates":template$="error"
+REMfile$="RO5WimpTemplates":template$="error"
 
 SYS "WimpTemplates_OpenTemplate",, file$
 

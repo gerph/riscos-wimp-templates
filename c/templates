@@ -19,7 +19,7 @@
 /* Whether wildcards are supported by identifier lookups */
 #define SUPPORT_WILDCARDS
 
-#define DEBUG
+//#define DEBUG
 
 #if defined(DEBUG) && !defined(IN_ASM_WIMP)
 #define dprintf if (1) printf
@@ -28,13 +28,12 @@
 #endif
 
 #if defined(DEBUG) && defined(IN_ASM_WIMP)
-void __swi(0) os_writec(int c);
 void __swi(2) os_write0(const char *s);
 void __swi(3) os_newline(void);
-void os_writehex(int x) {os_writec("0123456789abcdef"[(x)&15]);}
-#define msg(s) os_write0(s), os_newline()
-#define msgs(s, a) os_write0(s), os_write0(a), os_newline()
-#define msgi(s, a) os_write0(s), os_writec('&'), os_writehex(a>>28), \
+void __swi(0x100+4) os_writei4(void);
+#define msg(s) os_writei4(), os_write0(s), os_newline()
+#define msgs(s, a) os_writei4(), os_write0(s), os_write0(a), os_newline()
+#define msgi(s, a) os_writei4(), os_write0(s), os_writec('&'), os_writehex(a>>28), \
                                                  os_writehex(a>>24), \
                                                  os_writehex(a>>20), \
                                                  os_writehex(a>>16), \
@@ -44,12 +43,14 @@ void os_writehex(int x) {os_writec("0123456789abcdef"[(x)&15]);}
                                                  os_writehex(a>>0), \
                                                  os_newline()
 #else
-#define msg(s)
-#define msgs(s,a)
-#define msgi(s,a)
+#define msg(s) do {} while (0)
+#define msgs(s,a) do {} while (0)
+#define msgi(s,a) do {} while (0)
 #endif
 
 #ifdef IN_ASM_WIMP
+void __swi(0) os_writec(int c);
+void os_writehex(int x) {os_writec("0123456789abcdef"[(x)&15]);}
 #define opentemplates (global->g_opentemplates)
 #else
 static opentemplate_t *opentemplates;
@@ -101,9 +102,14 @@ int templates_seek(opentemplate_t *ot, fileoffset_t offset, int how)
 {
     int fail;
     //dprintf("templates_seek: offset=&%x, how=%i\n", offset, how);
+    //msgi("templates_seek: offset = ", offset);
+    //msgi("  how = ", how);
     fail = fseek(ot->fh, offset, how);
     if (fail)
-        dprintf("templates_seek: failed\n");
+    {
+        //dprintf("templates_seek: failed\n");
+        //msg("templates_seek: failed");
+    }
     return fail ? TE_EOF : TE_OK;
 }
 
@@ -443,10 +449,12 @@ templateerror_t templates_stringindirect(loadtemplatedata_t *ltd,
 
     templates_seek(ltd->ot, ltd->base_offset + ind_offset, SEEK_SET);
     //dprintf("Reading indirect string from file offset &%x to address %p (length %i)\n", ltd->base_offset + ind_offset, text, length);
+    //msgi("Reading indirect string from file offset ", ltd->base_offset + ind_offset);
     while (1)
     {
         int c = fgetc(ltd->ot->fh);
         //dprintf("  read byte %i\n", c);
+        //msgi("  read byte ", c);
         if (c==EOF)
             return TE_EOF;
 
@@ -498,6 +506,7 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
     templateerror_t terr;
 
     dprintf("  Processing icon, flags &%08x\n", iconflags);
+    msgi("  Processing icon, flags ", iconflags);
 
     if ( (iconflags & (Wimp_IconText | Wimp_IconSprite)) &&
          (iconflags & Wimp_IconIndirected) )
@@ -565,10 +574,12 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
     else if (iconflags & Wimp_IconText)
     {
         dprintf("    Text string in icon: %.12s\n", icondata->text);
+        msgs("    Text string in icon: ", (char*)icondata->text);
     }
     else if (iconflags & Wimp_IconSprite)
     {
         dprintf("    Sprite name in icon: %.12s\n", icondata->sprite);
+        msgs("    Sprite name in icon: ", (char*)icondata->sprite);
     }
 
     bufferdata_write_bytes(ltd->bufwin, icondata, sizeof(*icondata));
@@ -588,6 +599,7 @@ templateerror_t templates_fixupiconfont(loadtemplatedata_t *ltd,
 {
     Wimp_IconFlags flags = *iconflags;
     dprintf("  Icon flags &%08x\n", flags);
+    msgi("  Icon flags: ", flags);
     if (flags & Wimp_IconAntiAliased)
     {
         /* This is antialiased, so we need to claim the font */
@@ -596,6 +608,7 @@ templateerror_t templates_fixupiconfont(loadtemplatedata_t *ltd,
         templatefontentry_t *tfe;
 
         dprintf("  Is anti-aliased (font index %i)\n", fontindex);
+        msgi("  Is anti-aliased using font index: ", fontindex);
 
         /* Clear the font index mask, to let us put the font handle in */
         *iconflags = *iconflags & ~Wimp_IconFontHandle;
@@ -664,6 +677,7 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
     int read;
     int iconnum;
     loadtemplatedata_t ltd;
+    templateerror_t err;
     templates_seek(ot, offset, SEEK_SET);
 
     if (datatype == 1)
@@ -677,11 +691,39 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
         bufferdata_write_bytes(bufwin, &win.xscroll, sizeof(win.xscroll) + sizeof(win.yscroll));
         bufferdata_write_word(bufwin, 0xFFFFFFFF); /* Always force window to top */
         bufferdata_write_word(bufwin, win.flags);
+            {
+                Wimp_Window *base_of_window = (Wimp_Window*)bufferdata_address(bufwin, 0, false);
+                char *address = (char*)bufferdata_address(bufwin, 0, true);
+                msgi("Address of marker = ", ((int)address));
+                msgi("EXPECTED address of marker = ", ((int)&base_of_window->title_fg));
+                dprintf("Address of marker = &%08x\n", ((int)address));
+                dprintf("EXPECTED address of marker = &%08x\n", ((int)&base_of_window->title_fg));
+                if ( ((int)address) != ((int)&base_of_window->title_fg) )
+                {
+                    int *v = (int *)-1;
+                    *v = 0;
+                }
+            }
         bufferdata_write_bytes(bufwin, &win.title_fg, sizeof(win.title_fg) * 7 + sizeof(win.extra_flags)); /* The colours */
         bufferdata_write_bytes(bufwin, &win.extent, sizeof(win.extent));
         bufferdata_write_bytes(bufwin, &win.title_flags, sizeof(win.title_flags) * 2); /* Title + work area flags */
         bufferdata_write_word(bufwin, 1); /* FIXME: Should I be forcing sprite area to be the Wimp sprite pool? */
         bufferdata_write_bytes(bufwin, &win.xmin, sizeof(win.xmin) * 2);
+
+            {
+                Wimp_Window *base_of_window = (Wimp_Window*)bufferdata_address(bufwin, 0, false);
+                char *address = (char*)bufferdata_address(bufwin, 0, true);
+                msgi("Address of marker2 = ", ((int)address));
+                msgi("EXPECTED address of marker2 = ", ((int)&base_of_window->title_data));
+                dprintf("Address of marker2 = &%08x\n", ((int)address));
+                dprintf("EXPECTED address of marker2 = &%08x\n", ((int)&base_of_window->title_data));
+                if ( ((int)address) != ((int)&base_of_window->title_data) )
+                {
+                    int *v = (int *)-1;
+                    *v = 0;
+                }
+            }
+
 
         ltd.ot = ot;
         ltd.bufwin = bufwin;
@@ -693,14 +735,41 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
 
         /* Fixup title data */
         dprintf("Process title icon data\n");
-        templates_writeicondata(&ltd, win.title_flags, &win.title_data);
+        msg("Process title icon data");
+        err = templates_writeicondata(&ltd, win.title_flags, &win.title_data);
+        if (err != TE_OK)
+        {
+            dprintf("Failed to create title icon data: %i\n", err);
+            msgi("Failed to create title icon data: ", err);
+            return err;
+        }
 
-        bufferdata_write_word(bufwin, win.icon_count);
+        if (! bufferdata_failed(bufwin))
+        {
+            int *niconsp = (int*)bufferdata_address(bufwin, 0, true);
+            msgi("number of icons = ", win.icon_count);
+            bufferdata_write_word(bufwin, win.icon_count);
+            msgi("wrote number of icons = ", *niconsp);
+            {
+                Wimp_Window *base_of_window = (Wimp_Window*)bufferdata_address(bufwin, 0, false);
+                char *first_icon_address = (char*)bufferdata_address(bufwin, 0, true);
+                msgi("Address of first icon = ", ((int)first_icon_address));
+                msgi("EXPECTED address of first icon = ", ((int)&base_of_window->icons[0]));
+                dprintf("Address of first icon = &%08x\n", ((int)first_icon_address));
+                dprintf("EXPECTED address of first icon = &%08x\n", ((int)&base_of_window->icons[0]));
+                if ( ((int)first_icon_address) != ((int)&base_of_window->icons[0]) )
+                {
+                    int *v = (int *)-1;
+                    *v = 0;
+                }
+            }
+        }
         offset = Wimp_WindowHeaderSize;
         for (iconnum=0; iconnum < win.icon_count; iconnum++)
         {
             Wimp_Icon *icon = &win.icons[0];
             dprintf("Load icon #%i at offset &%x\n", iconnum, offset);
+            msgi("Load icon #", iconnum);
             templates_seek(ot, ltd.base_offset + offset, SEEK_SET);
             read = templates_read(ot, icon, sizeof(Wimp_Icon));
             if (read != sizeof(Wimp_Icon))
@@ -708,10 +777,22 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
             offset += read;
 
             bufferdata_write_bytes(bufwin, &icon->extent, sizeof(icon->extent));
+            if (! bufferdata_failed(bufwin))
+            {
+                int *iconflagsp = (int*)bufferdata_address(bufwin, 0, true);
+                msgi("  icon flags are at = ", (int)iconflagsp);
+            }
             bufferdata_write_word(bufwin, icon->flags);
 
             /* Handle the icon data */
-            templates_writeicondata(&ltd, icon->flags, &icon->data);
+            err = templates_writeicondata(&ltd, icon->flags, &icon->data);
+            if (err != TE_OK)
+            {
+                dprintf("Failed to create icon data: %i\n", err);
+                msgi("Failed to create icon data: ", err);
+                return err;
+            }
+
         }
 
         if (! bufferdata_failed(bufwin) &&
@@ -722,23 +803,28 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
             if (!enum_only)
             {
                 /* Only apply fixup if we're not enumerating */
-                templateerror_t terr;
-                terr = templates_fixupiconfont(&ltd, &win.title_flags);
-                if (terr)
+                msg("Fixup iconfont for title");
+                err = templates_fixupiconfont(&ltd, &win.title_flags);
+                if (err)
                 {
                     dprintf("Fixup of the font for the title failed\n");
-                    return terr;
+                    return err;
                 }
                 for (iconnum=0; iconnum < win.icon_count; iconnum++)
                 {
                     Wimp_Window *win = (Wimp_Window *)bufferdata_address(bufwin, 0, false);
                     Wimp_Icon *icon = &win->icons[iconnum];
                     dprintf("Fix icon #%i font\n", iconnum);
-                    terr = templates_fixupiconfont(&ltd, &icon->flags);
-                    if (terr)
+                    msgi("Fixup iconfont for icon #", iconnum);
+                    if (! bufferdata_failed(bufwin))
+                    {
+                        msgi("  icon flags are at = ", (int)&icon->flags);
+                    }
+                    err = templates_fixupiconfont(&ltd, &icon->flags);
+                    if (err)
                     {
                         dprintf("Fixup of the font for icon %i failed\n", iconnum);
-                        return terr;
+                        return err;
                     }
                 }
             }

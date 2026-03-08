@@ -44,10 +44,11 @@ static opentemplate_t *ot;
 void __swi(0) os_writec(int c);
 void __swi(2) os_write0(const char *s);
 void __swi(3) os_newline(void);
+void __swi(0x100+4) os_writei4(void);
 extern void os_writehex(int x);
-#define msg(s) os_write0(s), os_newline()
-#define msgs(s, a) os_write0(s), os_write0(a), os_newline()
-#define msgi(s, a) os_write0(s), os_writec('&'), os_writehex(a>>28), \
+#define msg(s) os_writei4(), os_write0(s), os_newline()
+#define msgs(s, a) os_writei4(), os_write0(s), os_write0(a), os_newline()
+#define msgi(s, a) os_writei4(), os_write0(s), os_writec('&'), os_writehex(a>>28), \
                                                  os_writehex(a>>24), \
                                                  os_writehex(a>>20), \
                                                  os_writehex(a>>16), \
@@ -57,9 +58,9 @@ extern void os_writehex(int x);
                                                  os_writehex(a>>0), \
                                                  os_newline()
 #else
-#define msg(s)
-#define msgs(s,a)
-#define msgi(s,a)
+#define msg(s) do {} while (0)
+#define msgs(s,a) do {} while (0)
+#define msgi(s,a) do {} while (0)
 #endif
 
 
@@ -86,6 +87,8 @@ _kernel_oserror *SWI_OpenTemplate(int number, _kernel_swi_regs *regs, void *pw)
     /* Input registers */
     char * file_name = (char *)regs->r[1];
     /* Output registers */
+
+    msgs("\nOpen templates: ", file_name);
 
     if (ot != NULL)
         templates_close(ot);
@@ -125,6 +128,7 @@ _kernel_oserror *SWI_CloseTemplate(int number, _kernel_swi_regs *regs, void *pw)
 
     /* Output registers */
 
+    msg("\nClosing template");
     if (ot)
     {
         templates_close(ot);
@@ -220,7 +224,7 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
 #define READ_SIZE ((void*)(0xFFFFFFFFul))
 #define NO_FONTS  ((void*)(0xFFFFFFFFul))
 
-    if (window == READ_SIZE)
+    if (window == READ_SIZE || window == 0)
     {
         window = NULL;
         data = NULL;
@@ -305,7 +309,7 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
 
     regs->r[6] = template_num + 1;
     if (err)
-        msg("Error");
+        msgi("Error: ", ((int)err));
     else
         msg("Success");
 
