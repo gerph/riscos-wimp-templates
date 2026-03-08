@@ -32,12 +32,34 @@ static opentemplate_t *ot;
 #endif
 
 
-//#define DEBUG
+#define DEBUG
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(IN_ASM_WIMP)
 #define dprintf if (1) printf
 #else
 #define dprintf if (0) printf
+#endif
+
+#if defined(DEBUG) && defined(IN_ASM_WIMP)
+void __swi(0) os_writec(int c);
+void __swi(2) os_write0(const char *s);
+void __swi(3) os_newline(void);
+extern void os_writehex(int x);
+#define msg(s) os_write0(s), os_newline()
+#define msgs(s, a) os_write0(s), os_write0(a), os_newline()
+#define msgi(s, a) os_write0(s), os_writec('&'), os_writehex(a>>28), \
+                                                 os_writehex(a>>24), \
+                                                 os_writehex(a>>20), \
+                                                 os_writehex(a>>16), \
+                                                 os_writehex(a>>12), \
+                                                 os_writehex(a>>8), \
+                                                 os_writehex(a>>4), \
+                                                 os_writehex(a>>0), \
+                                                 os_newline()
+#else
+#define msg(s)
+#define msgs(s,a)
+#define msgi(s,a)
 #endif
 
 
@@ -71,6 +93,7 @@ _kernel_oserror *SWI_OpenTemplate(int number, _kernel_swi_regs *regs, void *pw)
     ot = templates_open(file_name);
     if (ot == NULL)
     {
+        msg("Could not open template file");
         return err_WimpNoTemplateFile;
     }
 
@@ -183,6 +206,17 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     bufferdata_t bufind;
     bool enum_only = false;
 
+    msgs("Find template ", template_name);
+    msgi("  ind size: ", (end-data));
+    msgi("  wind: ", ((int)window));
+
+    if (ot == NULL)
+    {
+        /* There isn't a template open yet! */
+        msg("No templates open!");
+        return err_WimpNoTemplateFile;
+    }
+
 #define READ_SIZE ((void*)(0xFFFFFFFFul))
 #define NO_FONTS  ((void*)(0xFFFFFFFFul))
 
@@ -191,11 +225,7 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
         window = NULL;
         enum_only = true;
     }
-    if (data == READ_SIZE || (end - data) == 0)
-    {
-        data = NULL;
-        enum_only = true;
-    }
+    /* FIXME: We should probably check whether this memory is valid */
     if (font_ref == NO_FONTS) /* -1 and 0 are 'no fonts' */
         font_ref = NULL;
 
@@ -214,6 +244,7 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
             regs->r[6] = 0;
             return NULL;
         }
+        msg("Could not find template");
         return err_WimpNoTemplate;
     }
     dprintf("  Template number %i\n", template_num);
@@ -248,10 +279,13 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     {
         regs->r[1] = bufferdata_required(&bufwin);
         regs->r[2] = bufferdata_required(&bufind);
+        msgi("Need win: ", regs->r[1]);
+        msgi("Need ind: ", regs->r[2]);
     }
     else
     {
         regs->r[2] = (int)(data + bufferdata_required(&bufind));
+        msgi("End ind: ", regs->r[2]);
     }
 
     dprintf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
@@ -262,9 +296,16 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     dprintf("indirect buffer: %p\n", data);
 
     if (bufferdata_failed(&bufind) && !enum_only)
+    {
+        msg("Failed too big");
         return err_WimpTooBig;
+    }
 
     regs->r[6] = template_num + 1;
+    if (err)
+        msg("Error");
+    else
+        msg("Success");
 
     return err;
 }

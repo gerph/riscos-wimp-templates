@@ -19,12 +19,34 @@
 /* Whether wildcards are supported by identifier lookups */
 #define SUPPORT_WILDCARDS
 
-//#define DEBUG
+#define DEBUG
 
-#ifdef DEBUG
+#if defined(DEBUG) && !defined(IN_ASM_WIMP)
 #define dprintf if (1) printf
 #else
 #define dprintf if (0) printf
+#endif
+
+#if defined(DEBUG) && defined(IN_ASM_WIMP)
+void __swi(0) os_writec(int c);
+void __swi(2) os_write0(const char *s);
+void __swi(3) os_newline(void);
+void os_writehex(int x) {os_writec("0123456789abcdef"[(x)&15]);}
+#define msg(s) os_write0(s), os_newline()
+#define msgs(s, a) os_write0(s), os_write0(a), os_newline()
+#define msgi(s, a) os_write0(s), os_writec('&'), os_writehex(a>>28), \
+                                                 os_writehex(a>>24), \
+                                                 os_writehex(a>>20), \
+                                                 os_writehex(a>>16), \
+                                                 os_writehex(a>>12), \
+                                                 os_writehex(a>>8), \
+                                                 os_writehex(a>>4), \
+                                                 os_writehex(a>>0), \
+                                                 os_newline()
+#else
+#define msg(s)
+#define msgs(s,a)
+#define msgi(s,a)
 #endif
 
 #ifdef IN_ASM_WIMP
@@ -101,10 +123,13 @@ opentemplate_t *templates_open(const char *filename)
     if (ot == NULL)
         return NULL;
 
+    msgs("templates_open: ", filename);
+
     fh = fopen(filename, "rb");
     if (fh == NULL)
     {
         dprintf("templates_open: Failed to open file '%s'\n", filename);
+        msg("Failed to open");
         free(ot);
         return NULL;
     }
@@ -123,6 +148,7 @@ opentemplate_t *templates_open(const char *filename)
         templates_read_word(ot) != 0)
     {
         dprintf("Initial words are not 0\n");
+        msg("Initial header check failed");
         goto failed;
     }
 
@@ -146,6 +172,7 @@ opentemplate_t *templates_open(const char *filename)
         if (entries == NULL)
         {
             dprintf("Could not allocated memory for %i entries\n", nentries);
+            msg("Could not allocate memory");
             goto failed;
         }
 
@@ -155,6 +182,7 @@ opentemplate_t *templates_open(const char *filename)
         if (templates_read(ot, entries, size) != size)
         {
             dprintf("Could not read all the template data; give up\n");
+            msg("Could not read all template data");
             goto failed;
         }
 
@@ -167,6 +195,7 @@ opentemplate_t *templates_open(const char *filename)
                 if (len > 11)
                 {
                     dprintf("Invalid length of the identifier in template %i\n", i);
+                    msg("Bad template identifier length");
                     goto failed;
                 }
                 /* FIXME: identifiers should be allowed to be 12 character long, unterminated */
@@ -199,6 +228,7 @@ no_font_data:
             if (ot->font_data_offset > filesize)
             {
                 dprintf("Font data has an invalid file offset\n");
+                msg("Bad font data offset");
                 goto failed;
             }
             fonttablesize = filesize - ot->font_data_offset;
@@ -206,6 +236,11 @@ no_font_data:
             if (fonttablesize % sizeof(templatefontentry_t) != 0)
             {
                 dprintf("Font data has an invalid length (not a multiple of 48)\n");
+                msg("Bad font data length");
+                msgi("  nfonts = ", nfonts);
+                msgi("  fonttablesize = ", fonttablesize);
+                msgi("  sizeof(templatefontentry_t) = ", sizeof(templatefontentry_t));
+                msgi("  modulo size = ", fonttablesize % sizeof(templatefontentry_t));
                 goto failed;
             }
             ot->fonttable = malloc((int)fonttablesize);
@@ -214,6 +249,7 @@ no_font_data:
             if (templates_read(ot, ot->fonttable, (int)fonttablesize) != fonttablesize)
             {
                 dprintf("Failed to read font table\n");
+                msg("Failed to read font table");
                 goto failed;
             }
             ot->nfonts = nfonts;
@@ -226,11 +262,13 @@ no_font_data:
                 if (len > sizeof(ot->fonttable[i].fontname) - 1)
                 {
                     dprintf("Font name for index %i is not valid (too long, %i bytes)\n", i, len);
+                    msgi("Font name for index is too long: ", i);
                     goto failed;
                 }
                 if (len == 0)
                 {
                     dprintf("Font name for index %i is not valid (too short, %i bytes)\n", i, len);
+                    msgi("Font name for index is too short: ", i);
                     goto failed;
                 }
                 fontname[len] = '\0';
@@ -241,6 +279,7 @@ no_font_data:
                 {
                     dprintf("Font size for index %i is not valid (%i x %i)\n", i, ot->fonttable[i].xpointsize16,
                                                                                   ot->fonttable[i].ypointsize16);
+                    msgi("Font size for index is too long: ", i);
                     goto failed;
                 }
             }
