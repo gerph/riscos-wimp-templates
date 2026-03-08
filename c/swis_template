@@ -223,6 +223,8 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     if (window == READ_SIZE)
     {
         window = NULL;
+        data = NULL;
+        end = NULL;
         enum_only = true;
     }
     /* FIXME: We should probably check whether this memory is valid */
