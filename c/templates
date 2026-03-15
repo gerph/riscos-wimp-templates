@@ -28,8 +28,10 @@
 #endif
 
 #if defined(DEBUG) && defined(IN_ASM_WIMP)
+void __swi(0) os_writec(int c);
 void __swi(2) os_write0(const char *s);
 void __swi(3) os_newline(void);
+char __swi(4) os_readc(void);
 void __swi(0x100+4) os_writei4(void);
 #define msg(s) os_writei4(), os_write0(s), os_newline()
 #define msgs(s, a) os_writei4(), os_write0(s), os_write0(a), os_newline()
@@ -43,6 +45,11 @@ void __swi(0x100+4) os_writei4(void);
                                                  os_writehex(a>>0), \
                                                  os_newline()
 #else
+void __swi(0) os_writec(int c);
+void __swi(2) os_write0(const char *s);
+void __swi(3) os_newline(void);
+char __swi(4) os_readc(void);
+void __swi(0x100+4) os_writei4(void);
 #define msg(s) do {} while (0)
 #define msgs(s,a) do {} while (0)
 #define msgi(s,a) do {} while (0)
@@ -127,7 +134,10 @@ opentemplate_t *templates_open(const char *filename)
 
     ot = calloc(1, sizeof(*ot));
     if (ot == NULL)
+    {
+        msg("Initial open failed");
         return NULL;
+    }
 
     msgs("templates_open: ", filename);
 
@@ -481,8 +491,10 @@ templateerror_t templates_stringindirect(loadtemplatedata_t *ltd,
     {
         /* Write padding to the end of the indirected data field */
         //dprintf("Padding by %i bytes\n", length - wrote);
+        wrote += (length - wrote);
         bufferdata_write_bytespadded(ltd->bufind, NULL, 0, length - wrote);
     }
+    //dprintf("  wrote %i bytes\n", wrote);
 
     if (!bufferdata_failed(ltd->bufind))
         *textp = text;
@@ -528,6 +540,14 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
                 text_offset = 0;
         }
 
+#define offsetof(type, element) (unsigned int)( & (((type*)(NULL))->element) )
+
+        dprintf("text_offset = %i, end = %i\n", text_offset, offsetof(Wimp_Window, icons));
+        if (text_offset == 0 || text_offset == -1 || text_offset < offsetof(Wimp_Window, icons))
+        {
+            text_offset = 0;
+            icondata->indirected_text.text = -1;
+        }
         if (text_offset != 0)
         {
             terr = templates_stringindirect(ltd, text_offset, length, &text);
@@ -537,6 +557,12 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
 
         if (iconflags & Wimp_IconText)
         {
+            dprintf("validation_offset = %i, end = %i\n", validation_offset, offsetof(Wimp_Window, icons));
+            if (validation_offset == 0 || validation_offset == -1 || validation_offset < offsetof(Wimp_Window, icons))
+            {
+                validation_offset = 0;
+                icondata->indirected_text.validation = -1;
+            }
             if (validation_offset != 0)
             {
                 terr = templates_stringindirect(ltd, validation_offset, -1, &validation);
@@ -547,6 +573,8 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
 
         dprintf("    Indirect Text(%i): %s\n", length, text ? (char*)text : "<not written>");
         dprintf("    Validation: %s\n", validation ? (char*)validation : "<not written>");
+        msgs("    Indirect Text: ", text ? (char*)text : "<not written>");
+        msgs("    Validation: ", validation ? (char*)validation : "<not written>");
 
         if ( (iconflags & (Wimp_IconText | Wimp_IconSprite)) == Wimp_IconSprite )
         {
@@ -555,13 +583,17 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
             {
                 /* Indirect sprite points to actual sprite */
                 icondata->indirected_sprite.id = (OSSpriteOp_Id)NULL;
-                icondata->indirected_sprite.area = 0;
             }
             else
             {
                 /* Indirect sprite points to the sprite name */
                 icondata->indirected_sprite.id = (OSSpriteOp_Id)text;
-                icondata->indirected_sprite.area = 0;
+            }
+            /* Force the sprite area to be 1 if it's neither 0 or -1 */
+            if (icondata->indirected_sprite.area != 0 &&
+                icondata->indirected_sprite.area != -1)
+            {
+                icondata->indirected_sprite.area = 1;
             }
         }
         else
@@ -694,7 +726,9 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
         bufferdata_write_bytes(bufwin, &win.title_fg, sizeof(win.title_fg) * 7 + sizeof(win.extra_flags)); /* The colours */
         bufferdata_write_bytes(bufwin, &win.extent, sizeof(win.extent));
         bufferdata_write_bytes(bufwin, &win.title_flags, sizeof(win.title_flags) * 2); /* Title + work area flags */
-        bufferdata_write_word(bufwin, 1); /* FIXME: Should I be forcing sprite area to be the Wimp sprite pool? */
+        if (win.sprite_area != 0 && win.sprite_area != -1)
+            win.sprite_area = 1; /* Force to 1 */
+        bufferdata_write_word(bufwin, win.sprite_area);
         bufferdata_write_bytes(bufwin, &win.xmin, sizeof(win.xmin) * 2);
 
         ltd.ot = ot;

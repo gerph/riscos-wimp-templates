@@ -15,6 +15,8 @@ REM file$="Templates"
 REM file$="testdata.templates.fonttemplate":template$="desktop"
 REMfile$="WimpTemplates":template$="error"
 REMfile$="RO5WimpTemplates":template$="error"
+REMfile$="IndirectSprite":template$="Save"
+REMfile$="RevertTemplates":template$="newmode"
 
 SYS "WimpTemplates_OpenTemplate",, file$
 
@@ -32,6 +34,7 @@ WHILE continue%
         PRINT "  Required space: &";~reqwin%
         PRINT "  Indirect end: &";~indend%;"  Limit: &";~(ind%+indsize%)
         PRINT "  Next: ";next%
+        REM OSCLI("*MemoryI "+STR$~win%+"+200")
 
         IF createwin% THEN
             PRINT "Create window"
