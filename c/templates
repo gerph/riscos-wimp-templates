@@ -691,39 +691,11 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
         bufferdata_write_bytes(bufwin, &win.xscroll, sizeof(win.xscroll) + sizeof(win.yscroll));
         bufferdata_write_word(bufwin, 0xFFFFFFFF); /* Always force window to top */
         bufferdata_write_word(bufwin, win.flags);
-            {
-                Wimp_Window *base_of_window = (Wimp_Window*)bufferdata_address(bufwin, 0, false);
-                char *address = (char*)bufferdata_address(bufwin, 0, true);
-                msgi("Address of marker = ", ((int)address));
-                msgi("EXPECTED address of marker = ", ((int)&base_of_window->title_fg));
-                dprintf("Address of marker = &%08x\n", ((int)address));
-                dprintf("EXPECTED address of marker = &%08x\n", ((int)&base_of_window->title_fg));
-                if ( ((int)address) != ((int)&base_of_window->title_fg) )
-                {
-                    int *v = (int *)-1;
-                    *v = 0;
-                }
-            }
         bufferdata_write_bytes(bufwin, &win.title_fg, sizeof(win.title_fg) * 7 + sizeof(win.extra_flags)); /* The colours */
         bufferdata_write_bytes(bufwin, &win.extent, sizeof(win.extent));
         bufferdata_write_bytes(bufwin, &win.title_flags, sizeof(win.title_flags) * 2); /* Title + work area flags */
         bufferdata_write_word(bufwin, 1); /* FIXME: Should I be forcing sprite area to be the Wimp sprite pool? */
         bufferdata_write_bytes(bufwin, &win.xmin, sizeof(win.xmin) * 2);
-
-            {
-                Wimp_Window *base_of_window = (Wimp_Window*)bufferdata_address(bufwin, 0, false);
-                char *address = (char*)bufferdata_address(bufwin, 0, true);
-                msgi("Address of marker2 = ", ((int)address));
-                msgi("EXPECTED address of marker2 = ", ((int)&base_of_window->title_data));
-                dprintf("Address of marker2 = &%08x\n", ((int)address));
-                dprintf("EXPECTED address of marker2 = &%08x\n", ((int)&base_of_window->title_data));
-                if ( ((int)address) != ((int)&base_of_window->title_data) )
-                {
-                    int *v = (int *)-1;
-                    *v = 0;
-                }
-            }
-
 
         ltd.ot = ot;
         ltd.bufwin = bufwin;
@@ -744,26 +716,7 @@ templateerror_t templates_readtemplate(opentemplate_t *ot, int index,
             return err;
         }
 
-        if (! bufferdata_failed(bufwin))
-        {
-            int *niconsp = (int*)bufferdata_address(bufwin, 0, true);
-            msgi("number of icons = ", win.icon_count);
-            bufferdata_write_word(bufwin, win.icon_count);
-            msgi("wrote number of icons = ", *niconsp);
-            {
-                Wimp_Window *base_of_window = (Wimp_Window*)bufferdata_address(bufwin, 0, false);
-                char *first_icon_address = (char*)bufferdata_address(bufwin, 0, true);
-                msgi("Address of first icon = ", ((int)first_icon_address));
-                msgi("EXPECTED address of first icon = ", ((int)&base_of_window->icons[0]));
-                dprintf("Address of first icon = &%08x\n", ((int)first_icon_address));
-                dprintf("EXPECTED address of first icon = &%08x\n", ((int)&base_of_window->icons[0]));
-                if ( ((int)first_icon_address) != ((int)&base_of_window->icons[0]) )
-                {
-                    int *v = (int *)-1;
-                    *v = 0;
-                }
-            }
-        }
+        bufferdata_write_word(bufwin, win.icon_count);
         offset = Wimp_WindowHeaderSize;
         for (iconnum=0; iconnum < win.icon_count; iconnum++)
         {

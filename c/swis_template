@@ -292,6 +292,8 @@ _kernel_oserror *SWI_LoadTemplate(int number, _kernel_swi_regs *regs, void *pw)
     {
         regs->r[2] = (int)(data + bufferdata_required(&bufind));
         msgi("End ind: ", regs->r[2]);
+        msgi("Used win: ", bufferdata_required(&bufwin));
+        msgi("Used ind: ", bufferdata_required(&bufind));
     }
 
     dprintf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
