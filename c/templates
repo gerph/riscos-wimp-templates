@@ -421,7 +421,7 @@ int templates_findidentifier(opentemplate_t *ot, const ctrlstring_t ctrl,
  ******************************************************************/
 const char *templates_indextoname(opentemplate_t *ot, int index)
 {
-    if (index < 0 || index > ot->nentries)
+    if (index < 0 || index >= ot->nentries)
         return NULL; /* Not found - there isn't any template with that index */
     return ot->entries[index].identifier;
 }
