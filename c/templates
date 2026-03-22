@@ -5,6 +5,7 @@
  * Date:        2 Nov 2025
  ******************************************************************/
 
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -541,8 +542,6 @@ static templateerror_t templates_writeicondata(loadtemplatedata_t *ltd,
                 // It's a sprite pointer; flag as an invalid text_offset
                 text_offset = 0;
         }
-
-#define offsetof(type, element) (unsigned int)( & (((type*)(NULL))->element) )
 
         dprintf("text_offset = %i, end = %i\n", text_offset, offsetof(Wimp_Window, icons));
         if (text_offset == 0 || text_offset == -1 || text_offset < offsetof(Wimp_Window, icons))
