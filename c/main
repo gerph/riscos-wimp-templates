@@ -27,22 +27,25 @@ int fake_fontclaim(const char *fontname, int xpointsize16, int ypointsize16)
     return 1;
 }
 
-
-void load_template(opentemplate_t *ot, int argc, char *argv[])
+/*************************************************** Gerph *********
+ Function:      load_template
+ Description:   Load a specific template and check the behaviour
+ Parameters:    ot-> the open template we are operating on
+                template_name is the template to load, or NULL for first
+ Returns:       true if successful, false if failed
+ ******************************************************************/
+bool load_template(opentemplate_t *ot, const char *template_name)
 {
     templateerror_t terr;
     uint8_t window[1024 * 4];
     uint8_t indirect[1024 * 4];
-    char *template_name = NULL;
     int template_num = 0;
     bufferdata_t bufwin;
     bufferdata_t bufind;
     fontusagetable_t fontusage;
-
-    if (argc > 3)
-    {
-        template_name = argv[3];
-    }
+    bool success = true;
+    int needwin;
+    int needind;
 
     bufferdata_init(&bufwin, &window[0], sizeof(window));
     bufferdata_init(&bufind, &indirect[0], sizeof(indirect));
@@ -52,19 +55,39 @@ void load_template(opentemplate_t *ot, int argc, char *argv[])
     if (template_name != NULL)
     {
         printf("Finding template '%s'\n", template_name);
-        template_num = templates_findidentifier(ot, template_name, 0);
+        template_num = templates_findidentifier(ot, (const ctrlstring_t)template_name, 0);
         if (template_num == -1)
         {
             printf("Error finding identifier '%s'\n", template_name);
-            exit(1);
+            return false;
         }
         printf("  Template number %i\n", template_num);
     }
 
+    /* Sizing */
+    printf("  Sizing the template\n");
+    bufferdata_init(&bufwin, &window[0], 0);
+    bufferdata_init(&bufind, &indirect[0], 0);
+
+    terr = templates_readtemplate(ot, template_num, &bufwin, &bufind, &fontusage, false, fake_fontclaim);
+    needwin = bufferdata_required(&bufwin);
+    needind = bufferdata_required(&bufind);
+    printf("    Window needs:   %i bytes\n", needwin);
+    printf("    Indirect needs: %i bytes\n", needind);
+
+    /* Loading */
+    printf("  Loading the template\n");
+    bufferdata_init(&bufwin, &window[0], needwin);
+    bufferdata_init(&bufind, &indirect[0], needind);
+
+#define MAGIC (0x99)
+    memset(window, MAGIC, sizeof(window));
+    memset(indirect, MAGIC, sizeof(indirect));
+
     terr = templates_readtemplate(ot, template_num, &bufwin, &bufind, &fontusage, false, fake_fontclaim);
     if (terr)
     {
-        printf("Error reading template #%i: %i\n", template_num, terr);
+        printf("  ERROR: Error reading template #%i: %i\n", template_num, terr);
         switch (terr)
         {
             case TE_OK:             printf("  TE_OK\n"); break;
@@ -74,14 +97,83 @@ void load_template(opentemplate_t *ot, int argc, char *argv[])
             case TE_FONTSNEEDED:    printf("  TE_FONTSNEEDED\n"); break;
             default:                printf("  UNKNOWN\n"); break;
         }
+        success = false;
     }
+
+    {
+        int i;
+        printf("  Checking for corruption\n");
+        for (i=needwin; i<sizeof(window); i++)
+        {
+            if (window[i] != MAGIC)
+            {
+                printf("    ERROR: Window block has data corruption after buffer at index %i, (offset %i from end)\n", i, i-needwin);
+                success = false;
+                break;
+            }
+        }
+        for (i=needind; i<sizeof(indirect); i++)
+        {
+            if (indirect[i] != MAGIC)
+            {
+                printf("    ERROR: Indirect block has data corruption after buffer at index %i, (offset %i from end)\n", i, i-needind);
+                success = false;
+                break;
+            }
+        }
+    }
+
     printf("window buffering state: %s\n", bufferdata_failed(&bufwin) ? "FAIL" : "ok");
     printf("window buffer space needed: %i\n", bufferdata_required(&bufwin));
     printf("window buffer: %p\n", window);
     printf("indirect buffering state: %s\n", bufferdata_failed(&bufind) ? "FAIL" : "ok");
     printf("indirect buffer space needed: %i\n", bufferdata_required(&bufind));
     printf("indirect buffer: %p\n", indirect);
+    return success;
 }
+
+
+bool load_command(opentemplate_t *ot, int argc, char *argv[])
+{
+    const char *template_name = NULL;
+    bool all_success = true;
+    if (argc > 3)
+    {
+        template_name = argv[3];
+    }
+    if (template_name != NULL &&
+        strcmp(template_name, "ALL") == 0)
+    {
+        int index;
+        printf("Loading ALL templates\n");
+        for (index=0; ; index++)
+        {
+            bool success;
+            template_name = templates_indextoname(ot, index);
+            if (template_name == NULL)
+                break;
+            printf("\n+++ Loading template #%i '%s'\n", index, template_name);
+            success = load_template(ot, template_name);
+            if (!success)
+            {
+                printf("FAILED to load template '%s'\n", template_name);
+                all_success = false;
+            }
+        }
+    }
+    else
+    {
+        bool success;
+        success = load_template(ot, template_name);
+        if (!success)
+        {
+            printf("FAILED to load template '%s'\n", template_name);
+            all_success = false;
+        }
+    }
+    return all_success;
+}
+
 
 
 void enum_templates(opentemplate_t *ot, int argc, char *argv[])
@@ -148,7 +240,7 @@ int main(int argc, char *argv[])
 
     if (strcmp(command, "load") == 0)
     {
-        load_template(ot, argc, argv);
+        load_command(ot, argc, argv);
     }
     else if (strcmp(command, "enum") == 0)
     {

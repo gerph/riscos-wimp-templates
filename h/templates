@@ -100,7 +100,7 @@ int templates_close(opentemplate_t *ot);
                 start = index to start at (0 to start enumeration)
  Returns:       index to the template to use, or -1 if invalid
  ******************************************************************/
-int templates_findidentifier(opentemplate_t *ot, ctrlstring_t ctrl,
+int templates_findidentifier(opentemplate_t *ot, const ctrlstring_t ctrl,
                              int start);
 
 /*************************************************** Gerph *********
