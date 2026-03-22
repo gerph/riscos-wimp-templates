@@ -45,11 +45,6 @@ void __swi(0x100+4) os_writei4(void);
                                                  os_writehex(a>>0), \
                                                  os_newline()
 #else
-void __swi(0) os_writec(int c);
-void __swi(2) os_write0(const char *s);
-void __swi(3) os_newline(void);
-char __swi(4) os_readc(void);
-void __swi(0x100+4) os_writei4(void);
 #define msg(s) do {} while (0)
 #define msgs(s,a) do {} while (0)
 #define msgi(s,a) do {} while (0)
