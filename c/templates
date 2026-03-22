@@ -34,7 +34,7 @@ void __swi(3) os_newline(void);
 char __swi(4) os_readc(void);
 void __swi(0x100+4) os_writei4(void);
 #define msg(s) os_writei4(), os_write0(s), os_newline()
-#define msgs(s, a) os_writei4(), os_write0(s), os_write0(a), os_newline()
+#define msgs(s, a) os_writei4(), os_write0(s), os_writectrl((ctrlstring_t)a), os_newline()
 #define msgi(s, a) os_writei4(), os_write0(s), os_writec('&'), os_writehex(a>>28), \
                                                  os_writehex(a>>24), \
                                                  os_writehex(a>>20), \
@@ -58,6 +58,13 @@ void __swi(0x100+4) os_writei4(void);
 #ifdef IN_ASM_WIMP
 void __swi(0) os_writec(int c);
 void os_writehex(int x) {os_writec("0123456789abcdef"[(x)&15]);}
+void os_writectrl(ctrlstring_t s) {
+    char c;
+    while ((c=*s++) >= ' ')
+    {
+        os_writec(c);
+    }
+}
 #define opentemplates (global->g_opentemplates)
 #else
 static opentemplate_t *opentemplates;
