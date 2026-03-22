@@ -498,8 +498,8 @@ templateerror_t templates_stringindirect(loadtemplatedata_t *ltd,
     {
         /* Write padding to the end of the indirected data field */
         //dprintf("Padding by %i bytes\n", length - wrote);
-        wrote += (length - wrote);
         bufferdata_write_bytespadded(ltd->bufind, NULL, 0, length - wrote);
+        wrote += (length - wrote);
     }
     //dprintf("  wrote %i bytes\n", wrote);
 
