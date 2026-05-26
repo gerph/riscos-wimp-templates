@@ -24,7 +24,7 @@ jobs:
     # The build will terminate if any command returns a non-0 return code or an error.
     script:
       - echo Build the test program...
-      - amu -f Makefile
+      - amu -f MakefileTest
 
       - echo
       - echo Test that it runs
@@ -39,7 +39,7 @@ jobs:
       - aif32.wimptemplates enum testdata.templates.palette
 
       - echo Build the dummy module...
-      - amu -f MakefileModule
+      - amu -f Makefile
 
       - echo Load the module
       - rmload rm32.WimpTemplates
